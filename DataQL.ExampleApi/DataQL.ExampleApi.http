@@ -1,0 +1,127 @@
+@host = https://localhost:7090
+@sqliteSourceKey = sample-employees-db
+@sqlServerSourceKey = rm
+# Optional: set DATAQL_SQLSERVER_CONNECTION env var or ConnectionStrings:SqlServer
+# Example: Server=localhost,1433;Database=DataQLExample;User Id=sa;Password=Your_password123;TrustServerCertificate=True;
+###
+GET {{host}}/
+Accept: application/json
+###
+GET {{host}}/dataql/meta/openapi.json
+Accept: application/json
+###
+GET {{host}}/dataql/meta/sources
+Accept: application/json
+###
+GET {{host}}/dataql/meta/sources/{{sqliteSourceKey}}/tables
+Accept: application/json
+###
+GET {{host}}/dataql/meta/sources/{{sqliteSourceKey}}/tables/Employees/schema
+Accept: application/json
+###
+POST {{host}}/dataql/query/{{sqliteSourceKey}}/main.Employees
+Content-Type: application/json
+Accept: application/json
+
+{
+  "select": ["Name", "Id"],
+  "where": {
+    "Age": {
+      "$gte": 21
+    }
+  },
+  "order": [
+    {
+      "field": "Age",
+      "direction": "desc"
+    }
+  ],
+  "limit": 2,
+  "includeCount": true
+}
+###
+POST {{host}}/employees/query/manual/main.Employees
+Content-Type: application/json
+Accept: application/json
+
+{
+  "where": {
+    "$and": [
+      {
+        "IsActive": true
+      },
+      {
+        "Department": "Engineering"
+      }
+    ]
+  },
+  "order": [
+    {
+      "field": "City",
+      "direction": "asc"
+    }
+  ],
+  "includeCount": true
+}
+###
+POST {{host}}/dataql/query/{{sqlServerSourceKey}}/dbo.PsAssignmentResourceRequests
+Content-Type: application/json
+Accept: application/json
+
+{
+  "select": ["HomeMetro", "Id"],
+  "where": {
+    "HomeMetro": "Bengaluru"
+  },
+  "order": [
+    {
+      "field": "Id",
+      "direction": "desc"
+    }
+  ],
+  "limit": 5,
+  "includeCount": true
+}
+###
+POST {{host}}/dataql/query/{{sqlServerSourceKey}}/dbo.PsAssignmentResourceRequests
+Content-Type: application/json
+Accept: application/json
+
+{
+  "order": [
+    {
+      "field": "c",
+      "direction": "desc"
+    }
+  ],
+  "group": {
+    "groupBy": [
+      "ProjectId"
+    ],
+    "metrics": [
+      {
+        "field": "*",
+        "operation": "count",
+        "alias": "c"
+      }
+    ]
+  },
+  "limit":10
+}
+###
+POST {{host}}/employees/query/manual/sqlserver/dbo.Employees
+Content-Type: application/json
+Accept: application/json
+
+{
+  "where": {
+    "Department": "Engineering"
+  },
+  "order": [
+    {
+      "field": "City",
+      "direction": "asc"
+    }
+  ],
+  "includeCount": true
+}
