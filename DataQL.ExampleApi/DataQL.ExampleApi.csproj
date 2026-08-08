@@ -4,6 +4,7 @@
     <ProjectReference Include="..\DataQL.AspNetCore\DataQL.AspNetCore.csproj" />
     <ProjectReference Include="..\DataQL.Sqlite\DataQL.Sqlite.csproj" />
     <ProjectReference Include="..\DataQL.SqlServer\DataQL.SqlServer.csproj" />
+    <ProjectReference Include="..\DataQL.Cosmos\DataQL.Cosmos.csproj" />
   </ItemGroup>
 
   <ItemGroup>

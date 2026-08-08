@@ -85,21 +85,18 @@ public sealed class SqlServerQueryExecutionEngine
         long? count = null;
         if (request.IncludeCount)
         {
-            var countTranslation = translation;
-            if (request.Limit is > 0)
+            // SQL Server rejects ORDER BY inside the count subquery unless TOP/OFFSET is present.
+            // Count never needs ordering or paging, so always retranslate without them.
+            var countAst = ast with
             {
-                var countAst = ast with
+                Order = [],
+                Pagination = ast.Pagination with
                 {
-                    Order = [],
-                    Pagination = ast.Pagination with
-                    {
-                        Limit = null,
-                        IncludeCount = false
-                    }
-                };
-                countTranslation = _translator.Translate(countAst, tableName);
-            }
-
+                    Limit = null,
+                    IncludeCount = false
+                }
+            };
+            var countTranslation = _translator.Translate(countAst, tableName);
             count = await _executor.ExecuteCountAsync(connection, countTranslation, cancellationToken);
         }
 
@@ -373,19 +370,23 @@ public sealed class SqlServerQueryExecutionEngine
         SqlServerSqlTranslationResult translation,
         int limit)
     {
-        var targetTop = "TOP (" + limit + ")";
-        var replacementTop = "TOP (" + (limit + 1) + ")";
+        var sql = translation.Sql;
+        sql = sql.Replace("TOP (" + limit + ")", "TOP (" + (limit + 1) + ")", StringComparison.Ordinal);
+        sql = sql.Replace(
+            "FETCH NEXT " + limit + " ROWS ONLY",
+            "FETCH NEXT " + (limit + 1) + " ROWS ONLY",
+            StringComparison.Ordinal);
 
-        if (translation.Sql.Contains(targetTop, StringComparison.Ordinal))
+        if (sql == translation.Sql)
         {
-            return new SqlServerSqlTranslationResult
-            {
-                Sql = translation.Sql.Replace(targetTop, replacementTop, StringComparison.Ordinal),
-                Parameters = new Dictionary<string, object?>(translation.Parameters)
-            };
+            return translation;
         }
 
-        return translation;
+        return new SqlServerSqlTranslationResult
+        {
+            Sql = sql,
+            Parameters = new Dictionary<string, object?>(translation.Parameters)
+        };
     }
 
     private static IReadOnlyList<T> TrimToLimit<T>(IReadOnlyList<T> rows, int limit)

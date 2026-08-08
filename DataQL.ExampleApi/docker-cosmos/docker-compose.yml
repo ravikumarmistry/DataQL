@@ -1,0 +1,11 @@
+name: dataql-cosmos-example
+
+services:
+  dataql-cosmos:
+    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview
+    container_name: dataql-cosmos-example
+    environment:
+      PROTOCOL: https
+    ports:
+      - "${COSMOS_PORT:-8081}:8081"
+    mem_limit: 3g

@@ -205,7 +205,7 @@ public sealed class SqliteSqlTranslator
         var parts = new List<string>();
         foreach (var operation in filter.Operations)
         {
-            parts.Add(BuildOperation(field, operation, parameters, ref parameterIndex, alias: string.Empty));
+            parts.Add(BuildOperation(field, operation, parameters, ref parameterIndex));
         }
 
         return parts.Count == 1 ? parts[0] : "(" + string.Join(") AND (", parts) + ")";
@@ -262,7 +262,7 @@ public sealed class SqliteSqlTranslator
         var parts = new List<string>();
         foreach (var operation in filter.Operations)
         {
-            parts.Add(BuildOperation(field, operation, parameters, ref parameterIndex, alias));
+            parts.Add(BuildOperation(field, operation, parameters, ref parameterIndex));
         }
 
         return parts.Count == 1 ? parts[0] : "(" + string.Join(") AND (", parts) + ")";
@@ -272,16 +272,15 @@ public sealed class SqliteSqlTranslator
         string field,
         FieldOperation operation,
         IDictionary<string, object?> parameters,
-        ref int parameterIndex,
-        string alias)
+        ref int parameterIndex)
     {
         return operation switch
         {
             ScalarOperation scalar => BuildScalarOperation(field, scalar, parameters, ref parameterIndex),
             ListOperation list => BuildListOperation(field, list, parameters, ref parameterIndex),
             BooleanOperation boolean => BuildBooleanOperation(field, boolean),
-            IntegerOperation integer => BuildIntegerOperation(field, integer),
-            AnyOperation any => throw new NotSupportedException("Sqlite translation does not support $any yet."),
+            IntegerOperation => throw new NotSupportedException("Sqlite translation does not support integer array operators."),
+            AnyOperation => throw new NotSupportedException("Sqlite translation does not support $any."),
             _ => throw new NotSupportedException($"Unsupported operation type: {operation.GetType().Name}")
         };
     }
@@ -345,11 +344,6 @@ public sealed class SqliteSqlTranslator
                 : field + " IS NOT NULL",
             _ => throw new NotSupportedException($"Unsupported boolean operator: {operation.Operator}")
         };
-    }
-
-    private static string BuildIntegerOperation(string field, IntegerOperation operation)
-    {
-        throw new NotSupportedException("Sqlite translation does not support integer array operators yet.");
     }
 
     private static string BuildFieldReference(string dottedPath, string alias)

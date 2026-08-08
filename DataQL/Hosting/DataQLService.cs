@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using DataQL.Abstractions;
@@ -56,14 +57,37 @@ public sealed class DataQLService : IDataQLService
             throw new NotSupportedException($"No DataQL executor is registered for provider '{sourceRegistration.Provider}'.");
         }
 
-        using var connection = sourceRegistration.ConnectionFactory(_serviceProvider);
-        await DataQLConnectionHelper.OpenAsync(connection, cancellationToken);
+        await using var session = await sourceRegistration.SessionFactory(_serviceProvider);
 
-        return await executor.ExecuteAsync<T>(
-            connection,
+        var stopwatch = Stopwatch.StartNew();
+        var response = await executor.ExecuteAsync<T>(
+            session,
             source,
             request,
             cancellationToken);
+        stopwatch.Stop();
+
+        return WithMeta(response, sourceRegistration.Provider, stopwatch.ElapsedMilliseconds);
+    }
+
+    private static QueryResponse<T> WithMeta<T>(
+        QueryResponse<T> response,
+        string provider,
+        long executionTimeMs)
+    {
+        return new QueryResponse<T>
+        {
+            Results = response.Results,
+            HasMore = response.HasMore,
+            ContinuationToken = response.ContinuationToken,
+            Count = response.Count,
+            Meta = new QueryExecutionMeta
+            {
+                Provider = provider,
+                ExecutionTimeMs = executionTimeMs,
+                Extensions = response.Meta?.Extensions
+            }
+        };
     }
 
     private DataQLSourceRegistration GetRegistration(string sourceKey)

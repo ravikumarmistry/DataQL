@@ -7,6 +7,9 @@ public class CosmosProviderCapabilitiesTests
     {
         var translator = new DataQL.Cosmos.CosmosQueryTranslator();
 
+        Assert.True(translator.Capabilities.SupportsSelect);
+        Assert.False(translator.Capabilities.SupportsExclude);
+        Assert.False(translator.Capabilities.SupportsDistinct);
         Assert.True(translator.Capabilities.SupportsGrouping);
         Assert.False(translator.Capabilities.SupportsHaving);
         Assert.True(translator.Capabilities.SupportsNestedFields);

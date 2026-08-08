@@ -108,7 +108,7 @@ public class SqlServerSqlTranslatorTests
 
         Assert.Contains("GROUP BY [t].[Department]", result.Sql);
         Assert.Contains("COUNT(1) AS [employees]", result.Sql);
-        Assert.Contains("AVG([t].[Salary]) AS [avgSalary]", result.Sql);
+        Assert.Contains("AVG(CAST([t].[Salary] AS float)) AS [avgSalary]", result.Sql);
         Assert.Contains("WHERE [t].[IsActive] = @p0", result.Sql);
     }
 
@@ -150,5 +150,131 @@ public class SqlServerSqlTranslatorTests
                 [new GroupMetricAst(new FieldPath("Salary"), GroupMetricOperation.First, "firstSalary")]));
 
         Assert.Throws<NotSupportedException>(() => translator.Translate(ast, "Employees"));
+    }
+
+    [Fact]
+    public void Translate_WithDistinct_BuildsSelectDistinct()
+    {
+        var translator = new SqlServerSqlTranslator();
+        var ast = new QueryAst(
+            null,
+            new ProjectionAst(
+                [new FieldPath("City")],
+                [],
+                [new FieldPath("City"), new FieldPath("Department")]),
+            [new SortField(new FieldPath("City"), SortDirection.Asc)],
+            new PaginationAst(10, null, false, true),
+            null);
+
+        var result = translator.Translate(ast, "Employees");
+
+        Assert.StartsWith(
+            "SELECT DISTINCT TOP (10) [t].[City] AS [City], [t].[Department] AS [Department] FROM [Employees] AS [t]",
+            result.Sql);
+        Assert.Contains("ORDER BY [t].[City] ASC", result.Sql);
+    }
+
+    [Fact]
+    public void Translate_WithNestedField_UsesJsonValue()
+    {
+        var translator = new SqlServerSqlTranslator();
+        var ast = new QueryAst(
+            new FieldFilter(new FieldPath("Address.City"), [new ScalarOperation(FieldOperator.Eq, new ScalarValue("Delhi"))]),
+            new ProjectionAst([], [], []),
+            [],
+            new PaginationAst(null, null, false, false),
+            null);
+
+        var result = translator.Translate(ast, "Employees");
+
+        Assert.Contains("JSON_VALUE([t].[Address], '$.City') = @p0", result.Sql);
+        Assert.Equal("Delhi", result.Parameters["@p0"]);
+    }
+
+    [Fact]
+    public void Translate_WithSize_UsesOpenJsonCount()
+    {
+        var translator = new SqlServerSqlTranslator();
+        var ast = new QueryAst(
+            new FieldFilter(new FieldPath("Tags"), [new IntegerOperation(FieldOperator.Size, 2)]),
+            new ProjectionAst([], [], []),
+            [],
+            new PaginationAst(null, null, false, false),
+            null);
+
+        var result = translator.Translate(ast, "Employees");
+
+        Assert.Contains("(SELECT COUNT(1) FROM OPENJSON([t].[Tags])) = @p0", result.Sql);
+        Assert.Equal(2, result.Parameters["@p0"]);
+    }
+
+    [Fact]
+    public void Translate_WithContainsAny_UsesOpenJsonExists()
+    {
+        var translator = new SqlServerSqlTranslator();
+        var ast = new QueryAst(
+            new FieldFilter(
+                new FieldPath("Tags"),
+                [new ListOperation(FieldOperator.ContainsAny, [new ScalarValue("a"), new ScalarValue("b")])]),
+            new ProjectionAst([], [], []),
+            [],
+            new PaginationAst(null, null, false, false),
+            null);
+
+        var result = translator.Translate(ast, "Employees");
+
+        Assert.Contains("OPENJSON([t].[Tags])", result.Sql);
+        Assert.Contains("OR", result.Sql);
+        Assert.Equal("a", result.Parameters["@p0"]);
+        Assert.Equal("b", result.Parameters["@p1"]);
+    }
+
+    [Fact]
+    public void Translate_WithRegex_ThrowsNotSupportedException()
+    {
+        var translator = new SqlServerSqlTranslator();
+        var ast = new QueryAst(
+            new FieldFilter(new FieldPath("Name"), [new ScalarOperation(FieldOperator.Regex, new ScalarValue("Ada.*"))]),
+            new ProjectionAst([], [], []),
+            [],
+            new PaginationAst(null, null, false, false),
+            null);
+
+        var ex = Assert.Throws<NotSupportedException>(() => translator.Translate(ast, "Employees"));
+        Assert.Contains("regex", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Translate_WithEmptyTableName_ThrowsArgumentException()
+    {
+        var translator = new SqlServerSqlTranslator();
+        var ast = new QueryAst(
+            null,
+            new ProjectionAst([], [], []),
+            [],
+            new PaginationAst(null, null, false, false),
+            null);
+
+        Assert.Throws<ArgumentException>(() => translator.Translate(ast, "  "));
+    }
+
+    [Fact]
+    public void Translate_WithGroupedLimit_UsesFetchNext()
+    {
+        var translator = new SqlServerSqlTranslator();
+        var ast = new QueryAst(
+            null,
+            new ProjectionAst([], [], []),
+            [],
+            new PaginationAst(5, null, false, true),
+            new GroupAst(
+                [new FieldPath("Department")],
+                [new GroupMetricAst(new FieldPath("*"), GroupMetricOperation.Count, "employees")]));
+
+        var result = translator.Translate(ast, "Employees");
+
+        Assert.StartsWith("SELECT * FROM (", result.Sql);
+        Assert.Contains("GROUP BY [t].[Department]", result.Sql);
+        Assert.Contains("FETCH NEXT 5 ROWS ONLY", result.Sql);
     }
 }

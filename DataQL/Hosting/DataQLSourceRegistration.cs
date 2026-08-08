@@ -1,8 +1,8 @@
 using System;
-using System.Data;
+using System.Threading.Tasks;
 
 namespace DataQL;
 
 public sealed record DataQLSourceRegistration(
     string Provider,
-    Func<IServiceProvider, IDbConnection> ConnectionFactory);
+    Func<IServiceProvider, ValueTask<IDataQLSession>> SessionFactory);

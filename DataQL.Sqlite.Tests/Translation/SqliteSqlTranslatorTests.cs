@@ -177,4 +177,86 @@ public class SqliteSqlTranslatorTests
         Assert.Contains("ORDER BY \"t\".\"City\" ASC", result.Sql);
         Assert.EndsWith("LIMIT 10", result.Sql);
     }
+
+    [Fact]
+    public void Translate_WithEmptyTableName_ThrowsArgumentException()
+    {
+        var translator = new SqliteSqlTranslator();
+        var ast = new QueryAst(
+            null,
+            new ProjectionAst([], [], []),
+            [],
+            new PaginationAst(null, null, false, false),
+            null);
+
+        Assert.Throws<ArgumentException>(() => translator.Translate(ast, "  "));
+    }
+
+    [Fact]
+    public void Translate_WithNestedField_ThrowsNotSupportedException()
+    {
+        var translator = new SqliteSqlTranslator();
+        var ast = new QueryAst(
+            new FieldFilter(new FieldPath("Address.City"), [new ScalarOperation(FieldOperator.Eq, new ScalarValue("Delhi"))]),
+            new ProjectionAst([], [], []),
+            [],
+            new PaginationAst(null, null, false, false),
+            null);
+
+        var ex = Assert.Throws<NotSupportedException>(() => translator.Translate(ast, "Employees"));
+        Assert.Contains("single-segment", ex.Message);
+    }
+
+    [Fact]
+    public void Translate_WithAnyOperation_ThrowsNotSupportedException()
+    {
+        var translator = new SqliteSqlTranslator();
+        var predicate = new FieldFilter(
+            new FieldPath("Tag"),
+            [new ScalarOperation(FieldOperator.Eq, new ScalarValue("x"))]);
+        var ast = new QueryAst(
+            new FieldFilter(new FieldPath("Tags"), [new AnyOperation(predicate)]),
+            new ProjectionAst([], [], []),
+            [],
+            new PaginationAst(null, null, false, false),
+            null);
+
+        var ex = Assert.Throws<NotSupportedException>(() => translator.Translate(ast, "Employees"));
+        Assert.Contains("$any", ex.Message);
+    }
+
+    [Fact]
+    public void Translate_WithIntegerArrayOperation_ThrowsNotSupportedException()
+    {
+        var translator = new SqliteSqlTranslator();
+        var ast = new QueryAst(
+            new FieldFilter(new FieldPath("Tags"), [new IntegerOperation(FieldOperator.Size, 2)]),
+            new ProjectionAst([], [], []),
+            [],
+            new PaginationAst(null, null, false, false),
+            null);
+
+        var ex = Assert.Throws<NotSupportedException>(() => translator.Translate(ast, "Employees"));
+        Assert.Contains("integer array", ex.Message);
+    }
+
+    [Fact]
+    public void Translate_WithGroupedLimit_WrapsOuterSelect()
+    {
+        var translator = new SqliteSqlTranslator();
+        var ast = new QueryAst(
+            null,
+            new ProjectionAst([], [], []),
+            [],
+            new PaginationAst(5, null, false, true),
+            new GroupAst(
+                [new FieldPath("Department")],
+                [new GroupMetricAst(new FieldPath("*"), GroupMetricOperation.Count, "employees")]));
+
+        var result = translator.Translate(ast, "Employees");
+
+        Assert.StartsWith("SELECT * FROM (", result.Sql);
+        Assert.Contains("GROUP BY \"t\".\"Department\"", result.Sql);
+        Assert.EndsWith("LIMIT 5", result.Sql);
+    }
 }

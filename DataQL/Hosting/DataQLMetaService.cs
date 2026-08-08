@@ -49,10 +49,8 @@ public sealed class DataQLMetaService : IDataQLMetaService
     {
         var (registration, executor) = Resolve(sourceKey);
 
-        using var connection = registration.ConnectionFactory(_serviceProvider);
-        await DataQLConnectionHelper.OpenAsync(connection, cancellationToken);
-
-        return await executor.ListTablesAsync(connection, cancellationToken);
+        await using var session = await registration.SessionFactory(_serviceProvider);
+        return await executor.ListTablesAsync(session, cancellationToken);
     }
 
     public async Task<DataQLTableSchema> GetTableSchemaAsync(
@@ -67,10 +65,8 @@ public sealed class DataQLMetaService : IDataQLMetaService
 
         var (registration, executor) = Resolve(sourceKey);
 
-        using var connection = registration.ConnectionFactory(_serviceProvider);
-        await DataQLConnectionHelper.OpenAsync(connection, cancellationToken);
-
-        var schema = await executor.GetTableSchemaAsync(connection, tableName, cancellationToken);
+        await using var session = await registration.SessionFactory(_serviceProvider);
+        var schema = await executor.GetTableSchemaAsync(session, tableName, cancellationToken);
 
         return new DataQLTableSchema
         {

@@ -1,0 +1,60 @@
+<Project DefaultTargets="Report" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--
+    XUnit + Coverlet coverage report (Microsoft Learn style).
+
+    From repo root:
+      dotnet msbuild coverage.proj -t:Report
+      dotnet msbuild coverage.proj -t:Open
+
+    Collects Cobertura via Coverlet XPlat Code Coverage.
+    HTML via ReportGenerator (local tool in .config/dotnet-tools.json).
+  -->
+
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</RepoRoot>
+    <ResultsDirectory>$(RepoRoot)TestResults</ResultsDirectory>
+    <CoverageReportDir>$(RepoRoot)CoverageReport</CoverageReportDir>
+    <CoverageReports>$(ResultsDirectory)/**/coverage.cobertura.xml</CoverageReports>
+  </PropertyGroup>
+
+  <Target Name="RestoreTools">
+    <Exec WorkingDirectory="$(RepoRoot)" Command="dotnet tool restore" />
+  </Target>
+
+  <Target Name="CleanResults">
+    <RemoveDir Directories="$(ResultsDirectory)" Condition="Exists('$(ResultsDirectory)')" />
+    <RemoveDir Directories="$(CoverageReportDir)" Condition="Exists('$(CoverageReportDir)')" />
+  </Target>
+
+  <Target Name="Test" DependsOnTargets="CleanResults">
+    <Message Importance="high" Text="Running tests with Coverlet (XPlat Code Coverage)..." />
+    <Exec
+        WorkingDirectory="$(RepoRoot)"
+        Command="dotnet test DataQL.sln -c $(Configuration) --collect:&quot;XPlat Code Coverage&quot; --results-directory &quot;$(ResultsDirectory)&quot;" />
+  </Target>
+
+  <Target Name="GenerateReport" DependsOnTargets="RestoreTools">
+    <ItemGroup>
+      <_CoverageFiles Include="$(ResultsDirectory)\**\coverage.cobertura.xml" />
+    </ItemGroup>
+    <Error
+        Text="No coverage.cobertura.xml files found under TestResults. Run the Test target first."
+        Condition="'@(_CoverageFiles)' == ''" />
+    <Message Importance="high" Text="Generating HTML coverage report -> $(CoverageReportDir)" />
+    <Exec
+        WorkingDirectory="$(RepoRoot)"
+        Command="dotnet reportgenerator -reports:&quot;$(CoverageReports)&quot; -targetdir:&quot;$(CoverageReportDir)&quot; -reporttypes:Html" />
+    <Message Importance="high" Text="Open $(CoverageReportDir)\index.html" />
+  </Target>
+
+  <!-- Full pipeline (tests must pass). Or: dotnet msbuild coverage.proj -t:GenerateReport -->
+  <Target Name="Report" DependsOnTargets="Test;GenerateReport" />
+
+  <Target Name="Open" DependsOnTargets="Report">
+    <Exec
+        WorkingDirectory="$(RepoRoot)"
+        Command="cmd /c start &quot;&quot; &quot;$(CoverageReportDir)index.html&quot;"
+        Condition="'$(OS)' == 'Windows_NT'" />
+  </Target>
+</Project>

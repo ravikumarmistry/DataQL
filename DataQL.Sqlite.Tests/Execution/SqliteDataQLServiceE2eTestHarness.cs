@@ -69,24 +69,27 @@ internal sealed class SqliteDataQLServiceE2eTestHarness : IAsyncDisposable
         await _provider.DisposeAsync();
     }
 
+    // Keep aligned with testdata/Employees.json / provider docker init seed rows.
     private static void Seed(SqliteConnection connection)
     {
         using var create = connection.CreateCommand();
-        create.CommandText = @"
-CREATE TABLE Employees (
-  Id INTEGER PRIMARY KEY,
-  Name TEXT NOT NULL,
-  Age INTEGER NOT NULL,
-  City TEXT NOT NULL,
-  Department TEXT NOT NULL,
-  IsActive INTEGER NOT NULL,
-  Notes TEXT NULL
-);
-INSERT INTO Employees (Id, Name, Age, City, Department, IsActive, Notes) VALUES
-(1, 'Asha', 19, 'Delhi', 'Engineering', 1, 'junior'),
-(2, 'Arun', 24, 'Bengaluru', 'Engineering', 1, NULL),
-(3, 'Riya', 31, 'Delhi', 'Sales', 1, 'lead'),
-(4, 'Karan', 22, 'Pune', 'Engineering', 0, NULL);";
+        create.CommandText = """
+            CREATE TABLE Employees (
+              Id INTEGER PRIMARY KEY,
+              Name TEXT NOT NULL,
+              Age INTEGER NOT NULL,
+              City TEXT NOT NULL,
+              Department TEXT NOT NULL,
+              IsActive INTEGER NOT NULL,
+              Notes TEXT NULL,
+              CreatedAt TEXT NOT NULL
+            );
+            INSERT INTO Employees (Id, Name, Age, City, Department, IsActive, Notes, CreatedAt) VALUES
+            (1, 'Asha', 19, 'Delhi', 'Engineering', 1, 'junior', '2025-01-10T10:00:00Z'),
+            (2, 'Arun', 24, 'Bengaluru', 'Engineering', 1, NULL, '2025-01-11T10:00:00Z'),
+            (3, 'Riya', 31, 'Delhi', 'Sales', 1, 'lead', '2025-01-12T10:00:00Z'),
+            (4, 'Karan', 22, 'Pune', 'Engineering', 0, NULL, '2025-01-13T10:00:00Z');
+            """;
         create.ExecuteNonQuery();
     }
 }

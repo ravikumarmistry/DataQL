@@ -38,7 +38,7 @@ public sealed class CosmosSqlTranslator
         IDictionary<string, object?> parameters,
         ref int parameterIndex)
     {
-        var sql = "SELECT * FROM c";
+        var sql = "SELECT " + BuildSelectProjection(queryAst.Projection) + " FROM c";
 
         if (queryAst.Where is not null)
         {
@@ -51,16 +51,30 @@ public sealed class CosmosSqlTranslator
             sql += " ORDER BY " + string.Join(", ", queryAst.Order.Select(o => $"c.{o.Field.Value} {(o.Direction == SortDirection.Asc ? "ASC" : "DESC")}"));
         }
 
-        if (queryAst.Pagination.Limit is > 0)
-        {
-            sql += $" OFFSET 0 LIMIT {queryAst.Pagination.Limit.Value}";
-        }
+        // Paging uses Cosmos feed MaxItemCount + continuation tokens (no OFFSET/LIMIT in SQL).
 
         return new CosmosSqlTranslationResult
         {
             Sql = sql,
             Parameters = new Dictionary<string, object?>(parameters)
         };
+    }
+
+    private static string BuildSelectProjection(ProjectionAst projection)
+    {
+        if (projection.Select.Count == 0)
+        {
+            return "*";
+        }
+
+        return string.Join(", ", projection.Select.Select(static field =>
+        {
+            var path = field.Value;
+            var alias = path.Contains('.', StringComparison.Ordinal)
+                ? path.Replace('.', '_')
+                : path;
+            return $"c.{path} AS {alias}";
+        }));
     }
 
     private static CosmosSqlTranslationResult TranslateGrouped(
@@ -79,15 +93,18 @@ public sealed class CosmosSqlTranslator
         var projectionParts = new List<string>();
         foreach (var field in group.GroupBy)
         {
-            projectionParts.Add($"\"{BuildKeyAlias(field.Value)}\": c.{field.Value}");
+            var alias = BuildKeyAlias(field.Value);
+            projectionParts.Add($"c.{field.Value} AS {alias}");
         }
 
         foreach (var metric in group.Metrics)
         {
-            projectionParts.Add($"\"{metric.Alias}\": {BuildGroupMetricExpression(metric)}");
+            projectionParts.Add($"{BuildGroupMetricExpression(metric)} AS {metric.Alias}");
         }
 
-        var groupedSql = "SELECT VALUE {" + string.Join(", ", projectionParts) + "} FROM c";
+        // Prefer non-VALUE projections: SELECT VALUE { ... aggregates ... } is rejected by Cosmos
+        // ("Compositions of aggregates and other expressions are not allowed").
+        var groupedSql = "SELECT " + string.Join(", ", projectionParts) + " FROM c";
 
         if (queryAst.Where is not null)
         {
@@ -97,26 +114,14 @@ public sealed class CosmosSqlTranslator
 
         groupedSql += " GROUP BY " + string.Join(", ", groupByFields);
 
-        var sql = groupedSql;
-        if (queryAst.Order.Count > 0 || queryAst.Pagination.Limit is > 0)
-        {
-            sql = "SELECT * FROM (" + groupedSql + ") g";
-
-            if (queryAst.Order.Count > 0)
-            {
-                sql += " ORDER BY " + string.Join(", ", queryAst.Order.Select(o => $"g.{o.Field.Value} {(o.Direction == SortDirection.Asc ? "ASC" : "DESC")}"));
-            }
-
-            if (queryAst.Pagination.Limit is > 0)
-            {
-                sql += $" OFFSET 0 LIMIT {queryAst.Pagination.Limit.Value}";
-            }
-        }
+        // ORDER BY on grouped queries is unreliable across partitions; execution engine sorts
+        // client-side. Paging uses feed MaxItemCount + continuation (no OFFSET/LIMIT).
 
         return new CosmosSqlTranslationResult
         {
-            Sql = sql,
-            Parameters = new Dictionary<string, object?>(parameters)
+            Sql = groupedSql,
+            Parameters = new Dictionary<string, object?>(parameters),
+            IsGrouped = true
         };
     }
 

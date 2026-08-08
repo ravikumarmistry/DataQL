@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Threading;
@@ -18,26 +19,40 @@ public sealed class SqlServerDataQLProviderExecutor(
     public string Provider => ProviderName.SqlServer;
 
     public Task<QueryResponse<T>> ExecuteAsync<T>(
-        IDbConnection connection,
+        IDataQLSession session,
         QuerySource source,
         QueryRequest request,
         CancellationToken cancellationToken = default)
     {
+        var connection = RequireAdoConnection(session);
         return _engine.ExecuteAsync<T>(connection, source, request, cancellationToken);
     }
 
     public Task<IReadOnlyList<DataQLTableInfo>> ListTablesAsync(
-        IDbConnection connection,
+        IDataQLSession session,
         CancellationToken cancellationToken = default)
     {
+        var connection = RequireAdoConnection(session);
         return _metadata.ListTablesAsync(connection, cancellationToken);
     }
 
     public Task<DataQLTableSchema> GetTableSchemaAsync(
-        IDbConnection connection,
+        IDataQLSession session,
         string tableName,
         CancellationToken cancellationToken = default)
     {
+        var connection = RequireAdoConnection(session);
         return _metadata.GetTableSchemaAsync(connection, tableName, cancellationToken);
+    }
+
+    private static IDbConnection RequireAdoConnection(IDataQLSession session)
+    {
+        if (session is not AdoDataQLSession ado)
+        {
+            throw new InvalidOperationException(
+                $"SqlServer executor requires {nameof(AdoDataQLSession)}, but received '{session?.GetType().Name ?? "null"}'.");
+        }
+
+        return ado.Connection;
     }
 }

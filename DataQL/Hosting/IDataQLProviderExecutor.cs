@@ -1,4 +1,3 @@
-using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using DataQL.Abstractions;
@@ -11,17 +10,17 @@ public interface IDataQLProviderExecutor
     string Provider { get; }
 
     Task<QueryResponse<T>> ExecuteAsync<T>(
-        IDbConnection connection,
+        IDataQLSession session,
         QuerySource source,
         QueryRequest request,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<DataQLTableInfo>> ListTablesAsync(
-        IDbConnection connection,
+        IDataQLSession session,
         CancellationToken cancellationToken = default);
 
     Task<DataQLTableSchema> GetTableSchemaAsync(
-        IDbConnection connection,
+        IDataQLSession session,
         string tableName,
         CancellationToken cancellationToken = default);
 }

@@ -1,8 +1,9 @@
 @host = https://localhost:7090
 @sqliteSourceKey = sample-employees-db
-@sqlServerSourceKey = rm
-# Optional: set DATAQL_SQLSERVER_CONNECTION env var or ConnectionStrings:SqlServer
-# Example: Server=localhost,1433;Database=DataQLExample;User Id=sa;Password=Your_password123;TrustServerCertificate=True;
+@sqlServerSourceKey = p_sqlserver
+@cosmosSourceKey = p_cosmos
+# SQL Server: DataQL.ExampleApi/docker/.env.example
+# Cosmos: DataQL.ExampleApi/docker-cosmos/.env.example
 ###
 GET {{host}}/
 Accept: application/json
@@ -64,49 +65,25 @@ Accept: application/json
   "includeCount": true
 }
 ###
-POST {{host}}/dataql/query/{{sqlServerSourceKey}}/dbo.PsAssignmentResourceRequests
+POST {{host}}/dataql/query/{{sqlServerSourceKey}}/dbo.Employees
 Content-Type: application/json
 Accept: application/json
 
 {
-  "select": ["HomeMetro", "Id"],
+  "select": ["Name", "Id"],
   "where": {
-    "HomeMetro": "Bengaluru"
+    "Age": {
+      "$gte": 21
+    }
   },
   "order": [
     {
-      "field": "Id",
+      "field": "Age",
       "direction": "desc"
     }
   ],
-  "limit": 5,
+  "limit": 2,
   "includeCount": true
-}
-###
-POST {{host}}/dataql/query/{{sqlServerSourceKey}}/dbo.PsAssignmentResourceRequests
-Content-Type: application/json
-Accept: application/json
-
-{
-  "order": [
-    {
-      "field": "c",
-      "direction": "desc"
-    }
-  ],
-  "group": {
-    "groupBy": [
-      "ProjectId"
-    ],
-    "metrics": [
-      {
-        "field": "*",
-        "operation": "count",
-        "alias": "c"
-      }
-    ]
-  },
-  "limit":10
 }
 ###
 POST {{host}}/employees/query/manual/sqlserver/dbo.Employees
@@ -124,4 +101,27 @@ Accept: application/json
     }
   ],
   "includeCount": true
+}
+###
+GET {{host}}/dataql/meta/sources/{{cosmosSourceKey}}/tables
+Accept: application/json
+###
+POST {{host}}/dataql/query/{{cosmosSourceKey}}/Employees
+Content-Type: application/json
+Accept: application/json
+
+{
+  "select": ["Name", "Id"],
+  "where": {
+    "Age": {
+      "$gte": 21
+    }
+  },
+  "order": [
+    {
+      "field": "Age",
+      "direction": "desc"
+    }
+  ],
+  "limit": 2
 }

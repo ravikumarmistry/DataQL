@@ -223,6 +223,7 @@ public sealed class DataQLOpenApiDocumentBuilder
         return new JsonObject
         {
             ["type"] = "object",
+            ["required"] = new JsonArray("results", "hasMore", "_meta"),
             ["properties"] = new JsonObject
             {
                 ["results"] = new JsonObject
@@ -232,7 +233,19 @@ public sealed class DataQLOpenApiDocumentBuilder
                 },
                 ["hasMore"] = new JsonObject { ["type"] = "boolean" },
                 ["continuationToken"] = new JsonObject { ["type"] = "string", ["nullable"] = true },
-                ["count"] = new JsonObject { ["type"] = "integer", ["nullable"] = true }
+                ["count"] = new JsonObject { ["type"] = "integer", ["nullable"] = true },
+                ["_meta"] = new JsonObject
+                {
+                    ["type"] = "object",
+                    ["description"] = "Query execution diagnostics (required).",
+                    ["required"] = new JsonArray("provider", "executionTimeMs"),
+                    ["properties"] = new JsonObject
+                    {
+                        ["provider"] = new JsonObject { ["type"] = "string" },
+                        ["executionTimeMs"] = new JsonObject { ["type"] = "integer" }
+                    },
+                    ["additionalProperties"] = true
+                }
             }
         };
     }

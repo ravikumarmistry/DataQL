@@ -1,5 +1,6 @@
 using System;
 using System.Data;
+using System.Threading.Tasks;
 using DataQL.Abstractions;
 using DataQL.SqlServer.Execution;
 using Microsoft.Extensions.DependencyInjection;
@@ -36,6 +37,15 @@ public static class SqlServerDataQLOptionsExtensions
             sourceKey,
             new DataQLSourceRegistration(
                 ProviderName.SqlServer,
-                connectionFactory));
+                sp => CreateSessionAsync(connectionFactory, sp)));
+    }
+
+    private static async ValueTask<IDataQLSession> CreateSessionAsync(
+        Func<IServiceProvider, IDbConnection> connectionFactory,
+        IServiceProvider serviceProvider)
+    {
+        return await AdoDataQLSession.CreateAsync(
+            ProviderName.SqlServer,
+            connectionFactory(serviceProvider));
     }
 }

@@ -1,0 +1,53 @@
+name: dataql-sqlserver-tests
+
+services:
+  dataql-sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: dataql-sqlserver-tests
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Copy .env.example to .env first (cp .env.example .env)}
+      MSSQL_USER: ${MSSQL_USER:-sa}
+    ports:
+      - "${MSSQL_PORT:-1433}:1433"
+    volumes:
+      - dataql-sqlserver-tests-data:/var/opt/mssql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U \"$$MSSQL_USER\" -P \"$$MSSQL_SA_PASSWORD\" -C -Q \"SELECT 1\" || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  dataql-sqlserver-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: dataql-sqlserver-tests-init
+    depends_on:
+      dataql-sqlserver:
+        condition: service_healthy
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Copy .env.example to .env first (cp .env.example .env)}
+      MSSQL_USER: ${MSSQL_USER:-sa}
+      MSSQL_DATABASE: ${MSSQL_DATABASE:-DataQL}
+    volumes:
+      - ./init:/init:ro
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        set -e
+        /opt/mssql-tools18/bin/sqlcmd \
+          -S dataql-sqlserver \
+          -U "$$MSSQL_USER" \
+          -P "$$MSSQL_SA_PASSWORD" \
+          -C \
+          -v DatabaseName="$$MSSQL_DATABASE" \
+          -i /init/01-create-dataql.sql
+    restart: "no"
+
+volumes:
+  dataql-sqlserver-tests-data:

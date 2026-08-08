@@ -12,6 +12,10 @@ public class SqlServerProviderCapabilitiesTests
         Assert.True(translator.Capabilities.SupportsGrouping);
         Assert.True(translator.Capabilities.SupportsHaving);
         Assert.True(translator.Capabilities.SupportsNestedFields);
+        Assert.True(translator.Capabilities.SupportsDistinct);
+        Assert.Contains("$any", translator.Capabilities.SupportedOperators);
+        Assert.Contains("$size", translator.Capabilities.SupportedOperators);
+        Assert.DoesNotContain("$regex", translator.Capabilities.SupportedOperators);
         Assert.Contains("count", translator.Capabilities.SupportedGroupOperations);
         Assert.Contains("sum", translator.Capabilities.SupportedGroupOperations);
         Assert.Contains("avg", translator.Capabilities.SupportedGroupOperations);

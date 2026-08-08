@@ -25,6 +25,9 @@ public class SqliteDataQLServiceFiltersE2eTests
         Assert.Equal("Arun", response.Results[1].Name);
         Assert.True(response.HasMore);
         Assert.Equal(3, response.Count);
+        Assert.NotNull(response.Meta);
+        Assert.Equal("Sqlite", response.Meta.Provider);
+        Assert.True(response.Meta.ExecutionTimeMs >= 0);
     }
 
     [Fact]
@@ -266,6 +269,44 @@ public class SqliteDataQLServiceFiltersE2eTests
         var error = Assert.Single(ex.Errors);
         Assert.Equal("Capability.OperatorNotSupported", error.Code);
         Assert.Equal("Sqlite", error.Provider);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithNestedField_ThrowsAstValidationException()
+    {
+        await using var harness = SqliteDataQLServiceE2eTestHarness.Create();
+
+        var where = System.Text.Json.JsonDocument.Parse("""{"Address.City":"Delhi"}""").RootElement.Clone();
+        var request = new QueryRequest
+        {
+            Where = where,
+            Order = [new OrderClause { Field = "Name", Direction = "asc" }]
+        };
+
+        var ex = await Assert.ThrowsAsync<DataQL.Validation.AstValidationException>(() =>
+            harness.Service.ExecuteAsync<EmployeeRow>("sample", "Employees", request));
+
+        var error = Assert.Single(ex.Errors);
+        Assert.Equal("Capability.NestedFieldsNotSupported", error.Code);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithUnsupportedSize_ThrowsAstValidationException()
+    {
+        await using var harness = SqliteDataQLServiceE2eTestHarness.Create();
+
+        var where = System.Text.Json.JsonDocument.Parse("""{"Tags":{"$size":2}}""").RootElement.Clone();
+        var request = new QueryRequest
+        {
+            Where = where,
+            Order = [new OrderClause { Field = "Name", Direction = "asc" }]
+        };
+
+        var ex = await Assert.ThrowsAsync<DataQL.Validation.AstValidationException>(() =>
+            harness.Service.ExecuteAsync<EmployeeRow>("sample", "Employees", request));
+
+        var error = Assert.Single(ex.Errors);
+        Assert.Equal("Capability.OperatorNotSupported", error.Code);
     }
 
     private static async Task<IReadOnlyList<string>> QueryNamesAsync(QueryFilter filter)

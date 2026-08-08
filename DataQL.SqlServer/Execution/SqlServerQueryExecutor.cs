@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
-using DataQL.Contracts;
 using DataQL.SqlServer.Translation;
 using Microsoft.Extensions.Logging;
 
@@ -45,22 +44,6 @@ public sealed class SqlServerQueryExecutor(
             cancellationToken: cancellationToken);
 
         return await connection.ExecuteScalarAsync<long>(command);
-    }
-
-    public async Task<QueryResponse<T>> ExecuteAsync<T>(
-        IDbConnection connection,
-        SqlServerSqlTranslationResult translation,
-        CancellationToken cancellationToken = default)
-    {
-        var rows = await ExecuteRowsAsync<T>(connection, translation, cancellationToken);
-
-        return new QueryResponse<T>
-        {
-            Results = rows,
-            HasMore = false,
-            ContinuationToken = null,
-            Count = null
-        };
     }
 
     private static DynamicParameters ToDynamicParameters(IReadOnlyDictionary<string, object?> parameters)

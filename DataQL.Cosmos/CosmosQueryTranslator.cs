@@ -21,6 +21,9 @@ public sealed class CosmosQueryTranslator : IQueryProviderTranslator
             "$containsAny", "$containsAll", "$size", "$isEmpty", "$any",
             "$and", "$or", "$not"
         },
+        SupportsSelect = true,
+        SupportsExclude = false,
+        SupportsDistinct = false,
         SupportsGrouping = true,
         SupportsHaving = false,
         SupportsNestedFields = true,

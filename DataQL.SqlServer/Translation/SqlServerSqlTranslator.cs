@@ -21,11 +21,15 @@ public sealed class SqlServerSqlTranslator
 
         if (queryAst.Group is null)
         {
-            var projection = BuildProjection(queryAst.Projection, "[t]");
+            var useDistinct = queryAst.Projection.Distinct.Count > 0;
+            var projection = useDistinct
+                ? BuildDistinctProjection(queryAst.Projection.Distinct, "[t]")
+                : BuildProjection(queryAst.Projection, "[t]");
+            var distinctPrefix = useDistinct ? "DISTINCT " : string.Empty;
             var top = queryAst.Pagination.Limit is > 0
                 ? "TOP (" + queryAst.Pagination.Limit.Value + ") "
                 : string.Empty;
-            var sql = "SELECT " + top + projection + from;
+            var sql = "SELECT " + distinctPrefix + top + projection + from;
 
             if (queryAst.Where is not null)
             {
@@ -122,7 +126,7 @@ public sealed class SqlServerSqlTranslator
         {
             GroupMetricOperation.Count => "COUNT(1)",
             GroupMetricOperation.Sum => $"SUM({fieldExpression})",
-            GroupMetricOperation.Avg => $"AVG({fieldExpression})",
+            GroupMetricOperation.Avg => $"AVG(CAST({fieldExpression} AS float))",
             GroupMetricOperation.Min => $"MIN({fieldExpression})",
             GroupMetricOperation.Max => $"MAX({fieldExpression})",
             GroupMetricOperation.First => throw new NotSupportedException("SqlServer grouped translation does not support 'first' metric operation."),
@@ -418,6 +422,33 @@ public sealed class SqlServerSqlTranslator
     private static string BuildGroupKeyAlias(string fieldPath)
     {
         return fieldPath.Replace('.', '_');
+    }
+
+    private static string BuildDistinctProjection(IReadOnlyList<FieldPath> distinctFields, string alias)
+    {
+        var aliases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var selectedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var parts = new List<string>();
+
+        foreach (var field in distinctFields)
+        {
+            var path = field.Value;
+            if (string.IsNullOrWhiteSpace(path) || !selectedPaths.Add(path))
+            {
+                continue;
+            }
+
+            var expression = BuildFieldReference(path, alias);
+            var aliasName = BuildUniqueProjectionAlias(path, aliases);
+            parts.Add(expression + " AS " + QuoteIdentifier(aliasName));
+        }
+
+        if (parts.Count == 0)
+        {
+            throw new ArgumentException("Distinct projection cannot be empty.", nameof(distinctFields));
+        }
+
+        return string.Join(", ", parts);
     }
 
     private static string BuildProjection(ProjectionAst projection, string alias)

@@ -6,6 +6,7 @@ using DataQL.Abstractions;
 using DataQL.Contracts;
 using DataQL.SqlServer.Execution;
 using DataQL.SqlServer.Translation;
+using DataQL.Token;
 
 namespace DataQL.SqlServer.Tests.Execution;
 
@@ -186,6 +187,138 @@ public class SqlServerQueryExecutionEngineTests
             engine.ExecuteAsync<PersonRow>(connection, source, request));
 
         Assert.Null(fakeExecutor.LastRowsSql);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithInvalidContinuationToken_ThrowsArgumentException()
+    {
+        var fakeExecutor = new FakeExecutor(rows: [], count: 0);
+        var engine = new SqlServerQueryExecutionEngine(executor: fakeExecutor);
+        var source = new QuerySource(ProviderName.SqlServer, "Employees");
+
+        using var connection = new FakeConnection();
+        var request = new QueryRequest
+        {
+            Order = [new OrderClause { Field = "Age", Direction = "desc" }],
+            Limit = 2,
+            ContinuationToken = "not-a-valid-token"
+        };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            engine.ExecuteAsync<PersonRow>(connection, source, request));
+        Assert.Contains("Invalid continuation token", ex.Message);
+        Assert.Null(fakeExecutor.LastRowsSql);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithProviderMismatchContinuationToken_ThrowsArgumentException()
+    {
+        var protector = new Base64ContinuationTokenProtector();
+        var token = protector.Protect(new ContinuationTokenEnvelope
+        {
+            Provider = ProviderName.Sqlite,
+            QueryShapeHash = "abc",
+            ProviderToken = "{}"
+        });
+
+        var fakeExecutor = new FakeExecutor(rows: [], count: 0);
+        var engine = new SqlServerQueryExecutionEngine(executor: fakeExecutor, tokenProtector: protector);
+        var source = new QuerySource(ProviderName.SqlServer, "Employees");
+
+        using var connection = new FakeConnection();
+        var request = new QueryRequest
+        {
+            Order = [new OrderClause { Field = "Age", Direction = "desc" }],
+            Limit = 2,
+            ContinuationToken = token
+        };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            engine.ExecuteAsync<PersonRow>(connection, source, request));
+        Assert.Contains("provider mismatch", ex.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithNullConnection_ThrowsArgumentNullException()
+    {
+        var engine = new SqlServerQueryExecutionEngine(executor: new FakeExecutor([], 0));
+        var source = new QuerySource(ProviderName.SqlServer, "Employees");
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            engine.ExecuteAsync<PersonRow>(null!, source, new QueryRequest()));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithNullRequest_ThrowsArgumentNullException()
+    {
+        var engine = new SqlServerQueryExecutionEngine(executor: new FakeExecutor([], 0));
+        var source = new QuerySource(ProviderName.SqlServer, "Employees");
+
+        using var connection = new FakeConnection();
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            engine.ExecuteAsync<PersonRow>(connection, source, null!));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithWrongProvider_ThrowsArgumentException()
+    {
+        var engine = new SqlServerQueryExecutionEngine(executor: new FakeExecutor([], 0));
+        var source = new QuerySource(ProviderName.Sqlite, "Employees");
+
+        using var connection = new FakeConnection();
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            engine.ExecuteAsync<PersonRow>(connection, source, new QueryRequest()));
+        Assert.Contains("not valid for", ex.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithEmptyTableName_ThrowsArgumentException()
+    {
+        var engine = new SqlServerQueryExecutionEngine(executor: new FakeExecutor([], 0));
+        var source = new QuerySource(ProviderName.SqlServer, "   ");
+
+        using var connection = new FakeConnection();
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            engine.ExecuteAsync<PersonRow>(connection, source, new QueryRequest()));
+        Assert.Contains("table", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithGroupedLimit_BumpsFetchNextForHasMore()
+    {
+        var fakeExecutor = new FakeExecutor(
+            rows: [
+                new PersonRow { Name = "Engineering" },
+                new PersonRow { Name = "Sales" },
+                new PersonRow { Name = "HR" }
+            ],
+            count: 3);
+
+        var engine = new SqlServerQueryExecutionEngine(executor: fakeExecutor);
+        var source = new QuerySource(ProviderName.SqlServer, "Employees");
+
+        using var connection = new FakeConnection();
+        var request = new QueryRequest
+        {
+            Order = [new OrderClause { Field = "Name", Direction = "asc" }],
+            Group = new GroupRequest
+            {
+                GroupBy = ["Department"],
+                Metrics =
+                [
+                    new GroupMetricRequest { Operation = "count", Field = "*", Alias = "employees" }
+                ]
+            },
+            Limit = 2,
+            IncludeCount = false
+        };
+
+        var response = await engine.ExecuteAsync<PersonRow>(connection, source, request);
+
+        Assert.Equal(2, response.Results.Count);
+        Assert.True(response.HasMore);
+        Assert.NotNull(fakeExecutor.LastRowsSql);
+        Assert.Contains("FETCH NEXT 3 ROWS ONLY", fakeExecutor.LastRowsSql);
     }
 
     private sealed class PersonRow

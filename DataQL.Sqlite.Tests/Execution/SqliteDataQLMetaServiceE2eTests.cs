@@ -56,4 +56,15 @@ public class SqliteDataQLMetaServiceE2eTests
         Assert.True(schema.Schema.TryGetProperty("properties", out var properties));
         Assert.True(properties.TryGetProperty("Id", out _));
     }
+
+    [Fact]
+    public async Task GetTableSchemaAsync_WithMissingTable_ThrowsInvalidOperationException()
+    {
+        await using var harness = SqliteDataQLServiceE2eTestHarness.Create();
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            harness.MetaService.GetTableSchemaAsync("sample", "DoesNotExist"));
+
+        Assert.Contains("DoesNotExist", ex.Message);
+    }
 }

@@ -25,6 +25,7 @@ public sealed class SqlServerQueryTranslator : IQueryProviderTranslator
         SupportsGrouping = true,
         SupportsHaving = true,
         SupportsNestedFields = true,
+        SupportsDistinct = true,
         SupportedGroupOperations = new HashSet<string>
         {
             "count", "sum", "avg", "min", "max"

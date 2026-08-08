@@ -53,7 +53,7 @@ public class CosmosQueryTranslatorGroupTests
     }
 
     [Fact]
-    public void Translate_WithGroupOrderAndLimit_WrapsGroupedQuery()
+    public void Translate_WithGroupOrderAndLimit_OmitsSqlOrderBy()
     {
         var translator = new CosmosSqlTranslator();
         var ast = new QueryAst(
@@ -67,9 +67,11 @@ public class CosmosQueryTranslatorGroupTests
 
         var result = translator.Translate(ast);
 
-        Assert.StartsWith("SELECT * FROM (", result.Sql);
-        Assert.Contains("ORDER BY g.employees DESC", result.Sql);
-        Assert.Contains("OFFSET 0 LIMIT 10", result.Sql);
+        Assert.StartsWith("SELECT c.department AS department,", result.Sql);
+        Assert.Contains("COUNT(1) AS employees", result.Sql);
+        Assert.DoesNotContain("ORDER BY", result.Sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("OFFSET", result.Sql, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("LIMIT", result.Sql, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

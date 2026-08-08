@@ -22,12 +22,14 @@ _ReSharper*/
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# Test results
+# Test results / coverage
 TestResults/
+CoverageReport/
 *.trx
 *.coverage
 *.coveragexml
 *.opencover.xml
+*.cobertura.xml
 coverage*.json
 coverage*.xml
 
@@ -49,8 +51,10 @@ Thumbs.db
 # Local environment overrides
 .env
 .env.*
+!.env.example
+!**/.env.example
 
-# SonarQube
+# Leftover SonarQube working dirs (no longer used)
 .sonarqube/
 .sonarqube.old.*/
 .sonar/
