@@ -9,6 +9,10 @@ docker compose up -d
 dotnet test ..
 ```
 
+Without this stack (or `DATAQL_SQLSERVER_CONNECTION`), SQL Server E2E tests
+marked `[SqlServerAvailableFact]` are skipped. Unit tests in the same project
+still run. Phase 1 CI does not start Docker, so those E2E tests soft-skip there.
+
 Settings live in `.env.example`. Tests load `.env` (preferred) or `.env.example`.
 
 Init seeds `dbo.Employees` from `testdata/Employees.json`, including JSON columns
