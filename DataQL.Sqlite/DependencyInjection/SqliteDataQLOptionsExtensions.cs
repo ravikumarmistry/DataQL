@@ -30,7 +30,10 @@ public static class SqliteDataQLOptionsExtensions
             throw new ArgumentNullException(nameof(connectionFactory));
         }
 
-        options.Services.TryAddSingleton<SqliteQueryExecutionEngine>();
+        options.Services.TryAddSingleton<ISqliteQueryExecutor, SqliteQueryExecutor>();
+        options.Services.TryAddSingleton<SqliteQueryExecutionEngine>(sp =>
+            new SqliteQueryExecutionEngine(
+                executor: sp.GetRequiredService<ISqliteQueryExecutor>()));
         options.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IDataQLProviderExecutor, SqliteDataQLProviderExecutor>());
 
         return options.AddSource(

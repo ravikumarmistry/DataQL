@@ -30,7 +30,10 @@ public static class SqlServerDataQLOptionsExtensions
             throw new ArgumentNullException(nameof(connectionFactory));
         }
 
-        options.Services.TryAddSingleton<SqlServerQueryExecutionEngine>();
+        options.Services.TryAddSingleton<ISqlServerQueryExecutor, SqlServerQueryExecutor>();
+        options.Services.TryAddSingleton<SqlServerQueryExecutionEngine>(sp =>
+            new SqlServerQueryExecutionEngine(
+                executor: sp.GetRequiredService<ISqlServerQueryExecutor>()));
         options.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IDataQLProviderExecutor, SqlServerDataQLProviderExecutor>());
 
         return options.AddSource(

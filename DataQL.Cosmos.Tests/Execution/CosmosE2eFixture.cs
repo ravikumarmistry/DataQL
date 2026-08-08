@@ -31,10 +31,66 @@ public sealed class CosmosE2eFixture : IAsyncLifetime
             new ContainerProperties(ContainerId, partitionKeyPath: "/id"));
         var container = containerResponse.Container;
 
-        await UpsertEmployeeAsync(container, "1", "Asha", 19, "Delhi", "Engineering", true, "junior", "2025-01-10T10:00:00Z");
-        await UpsertEmployeeAsync(container, "2", "Arun", 24, "Bengaluru", "Engineering", true, null, "2025-01-11T10:00:00Z");
-        await UpsertEmployeeAsync(container, "3", "Riya", 31, "Delhi", "Sales", true, "lead", "2025-01-12T10:00:00Z");
-        await UpsertEmployeeAsync(container, "4", "Karan", 22, "Pune", "Engineering", false, null, "2025-01-13T10:00:00Z");
+        // Keep aligned with testdata/Employees.json.
+        await UpsertEmployeeAsync(container, new EmployeeSeed(
+            Id: "1",
+            Name: "Asha",
+            Age: 19,
+            City: "Delhi",
+            Department: "Engineering",
+            IsActive: true,
+            Notes: "junior",
+            CreatedAt: "2025-01-10T10:00:00Z",
+            Tags: ["junior", "remote"],
+            Skills: ["C#", ".NET"],
+            Address: new AddressSeed("Delhi", "India"),
+            Projects: [new ProjectSeed("Alpha", "Active", 30)]));
+
+        await UpsertEmployeeAsync(container, new EmployeeSeed(
+            Id: "2",
+            Name: "Arun",
+            Age: 24,
+            City: "Bengaluru",
+            Department: "Engineering",
+            IsActive: true,
+            Notes: null,
+            CreatedAt: "2025-01-11T10:00:00Z",
+            Tags: ["senior"],
+            Skills: ["Java", "Azure"],
+            Address: new AddressSeed("Bengaluru", "India"),
+            Projects: [new ProjectSeed("Beta", "Done", 10)]));
+
+        await UpsertEmployeeAsync(container, new EmployeeSeed(
+            Id: "3",
+            Name: "Riya",
+            Age: 31,
+            City: "Delhi",
+            Department: "Sales",
+            IsActive: true,
+            Notes: "lead",
+            CreatedAt: "2025-01-12T10:00:00Z",
+            Tags: ["lead", "remote", "sales"],
+            Skills: ["Azure", ".NET", "SQL"],
+            Address: new AddressSeed("Delhi", "India"),
+            Projects:
+            [
+                new ProjectSeed("Gamma", "Active", 25),
+                new ProjectSeed("Delta", "Active", 5)
+            ]));
+
+        await UpsertEmployeeAsync(container, new EmployeeSeed(
+            Id: "4",
+            Name: "Karan",
+            Age: 22,
+            City: "Pune",
+            Department: "Engineering",
+            IsActive: false,
+            Notes: null,
+            CreatedAt: "2025-01-13T10:00:00Z",
+            Tags: [],
+            Skills: [],
+            Address: new AddressSeed("Pune", "India"),
+            Projects: []));
     }
 
     public Task DisposeAsync()
@@ -43,42 +99,59 @@ public sealed class CosmosE2eFixture : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private static Task UpsertEmployeeAsync(
-        Container container,
-        string id,
-        string name,
-        int age,
-        string city,
-        string department,
-        bool isActive,
-        string? notes,
-        string createdAt)
+    private static Task UpsertEmployeeAsync(Container container, EmployeeSeed seed)
     {
         // Omit null Notes so $exists:false matches documents without the property (Sqlite NULL semantics).
-        object doc = notes is null
+        object doc = seed.Notes is null
             ? new
             {
-                id,
-                Name = name,
-                Age = age,
-                City = city,
-                Department = department,
-                IsActive = isActive,
-                CreatedAt = createdAt
+                id = seed.Id,
+                Name = seed.Name,
+                Age = seed.Age,
+                City = seed.City,
+                Department = seed.Department,
+                IsActive = seed.IsActive,
+                CreatedAt = seed.CreatedAt,
+                Tags = seed.Tags,
+                Skills = seed.Skills,
+                Address = seed.Address,
+                Projects = seed.Projects
             }
             : new
             {
-                id,
-                Name = name,
-                Age = age,
-                City = city,
-                Department = department,
-                IsActive = isActive,
-                Notes = notes,
-                CreatedAt = createdAt
+                id = seed.Id,
+                Name = seed.Name,
+                Age = seed.Age,
+                City = seed.City,
+                Department = seed.Department,
+                IsActive = seed.IsActive,
+                Notes = seed.Notes,
+                CreatedAt = seed.CreatedAt,
+                Tags = seed.Tags,
+                Skills = seed.Skills,
+                Address = seed.Address,
+                Projects = seed.Projects
             };
-        return container.UpsertItemAsync(doc, new PartitionKey(id));
+        return container.UpsertItemAsync(doc, new PartitionKey(seed.Id));
     }
+
+    private sealed record AddressSeed(string City, string Country);
+
+    private sealed record ProjectSeed(string Name, string Status, int Hours);
+
+    private sealed record EmployeeSeed(
+        string Id,
+        string Name,
+        int Age,
+        string City,
+        string Department,
+        bool IsActive,
+        string? Notes,
+        string CreatedAt,
+        string[] Tags,
+        string[] Skills,
+        AddressSeed Address,
+        ProjectSeed[] Projects);
 }
 
 [CollectionDefinition(Name)]

@@ -46,6 +46,22 @@ public sealed class SqlServerE2eFixture : IAsyncLifetime
                 + "Start DataQL.SqlServer.Tests/docker so compose init can seed the database.");
         }
 
+        await using var columnCommand = connection.CreateCommand();
+        columnCommand.CommandText = """
+            SELECT COUNT(1)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = 'dbo'
+              AND TABLE_NAME = 'Employees'
+              AND COLUMN_NAME IN ('Tags', 'Skills', 'Address', 'Projects');
+            """;
+        var jsonColumnCount = Convert.ToInt32(await columnCommand.ExecuteScalarAsync());
+        if (jsonColumnCount < 4)
+        {
+            throw new InvalidOperationException(
+                $"Database '{DatabaseName}'.dbo.Employees is missing JSON seed columns (Tags/Skills/Address/Projects). "
+                + "Recreate the docker volume: cd DataQL.SqlServer.Tests/docker && docker compose down -v && docker compose up -d.");
+        }
+
         await using var rowCountCommand = connection.CreateCommand();
         rowCountCommand.CommandText = "SELECT COUNT(1) FROM dbo.Employees;";
         var rowCount = Convert.ToInt32(await rowCountCommand.ExecuteScalarAsync());

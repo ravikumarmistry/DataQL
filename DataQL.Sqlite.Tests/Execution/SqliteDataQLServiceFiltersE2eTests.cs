@@ -28,6 +28,37 @@ public class SqliteDataQLServiceFiltersE2eTests
         Assert.NotNull(response.Meta);
         Assert.Equal("Sqlite", response.Meta.Provider);
         Assert.True(response.Meta.ExecutionTimeMs >= 0);
+
+        Assert.Contains(
+            harness.LogMessages,
+            m => m.Contains("SqliteQueryExecutor", StringComparison.Ordinal)
+                && m.Contains("rows", StringComparison.Ordinal)
+                && m.Contains("@p0=21", StringComparison.Ordinal));
+        Assert.Contains(
+            harness.LogMessages,
+            m => m.Contains("SqliteQueryExecutor", StringComparison.Ordinal)
+                && m.Contains("count", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithoutWhere_LogsEmptyParameterBag()
+    {
+        await using var harness = SqliteDataQLServiceE2eTestHarness.Create();
+
+        var response = await harness.Service.ExecuteAsync<EmployeeRow>(
+            "sample",
+            "Employees",
+            new QueryRequest
+            {
+                Order = [new OrderClause { Field = "Name", Direction = "asc" }],
+                Limit = 1
+            });
+
+        Assert.Single(response.Results);
+        Assert.Contains(
+            harness.LogMessages,
+            m => m.Contains("SqliteQueryExecutor", StringComparison.Ordinal)
+                && m.Contains("| Parameters: {}", StringComparison.Ordinal));
     }
 
     [Fact]

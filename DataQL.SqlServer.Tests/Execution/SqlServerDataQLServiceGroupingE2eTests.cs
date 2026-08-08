@@ -398,6 +398,115 @@ public class SqlServerDataQLServiceGroupingE2eTests
     }
 
     [SqlServerAvailableFact]
+    public async Task ExecuteAsync_WithHavingAnd_FiltersGroupedRows()
+    {
+        await using var harness = SqlServerDataQLServiceE2eTestHarness.Create(_fixture);
+
+        var having = QueryFilterBuilder.And(
+            QueryFilterBuilder.Field("employees").Gte(2),
+            QueryFilterBuilder.Field("Department").Eq("Engineering"));
+
+        var response = await harness.Service.ExecuteAsync<DepartmentCountRow>(
+            SqlServerTestEnvironment.SourceKey,
+            "Employees",
+            new QueryRequest
+            {
+                Order = [new OrderClause { Field = "Department", Direction = "asc" }],
+                Group = new GroupRequest
+                {
+                    GroupBy = ["Department"],
+                    Metrics =
+                    [
+                        new GroupMetricRequest
+                        {
+                            Field = "*",
+                            Operation = "count",
+                            Alias = "employees"
+                        }
+                    ],
+                    Having = having.ToJsonElement()
+                }
+            });
+
+        Assert.Single(response.Results);
+        Assert.Equal("Engineering", response.Results[0].Department);
+        Assert.Equal(3, response.Results[0].Employees);
+    }
+
+    [SqlServerAvailableFact]
+    public async Task ExecuteAsync_WithHavingOr_FiltersGroupedRows()
+    {
+        await using var harness = SqlServerDataQLServiceE2eTestHarness.Create(_fixture);
+
+        var having = QueryFilterBuilder.Or(
+            QueryFilterBuilder.Field("employees").Gte(3),
+            QueryFilterBuilder.Field("Department").Eq("Sales"));
+
+        var response = await harness.Service.ExecuteAsync<DepartmentCountRow>(
+            SqlServerTestEnvironment.SourceKey,
+            "Employees",
+            new QueryRequest
+            {
+                Order = [new OrderClause { Field = "Department", Direction = "asc" }],
+                Group = new GroupRequest
+                {
+                    GroupBy = ["Department"],
+                    Metrics =
+                    [
+                        new GroupMetricRequest
+                        {
+                            Field = "*",
+                            Operation = "count",
+                            Alias = "employees"
+                        }
+                    ],
+                    Having = having.ToJsonElement()
+                }
+            });
+
+        Assert.Equal(2, response.Results.Count);
+        Assert.Equal("Engineering", response.Results[0].Department);
+        Assert.Equal(3, response.Results[0].Employees);
+        Assert.Equal("Sales", response.Results[1].Department);
+        Assert.Equal(1, response.Results[1].Employees);
+    }
+
+    [SqlServerAvailableFact]
+    public async Task ExecuteAsync_WithHavingNot_FiltersGroupedRows()
+    {
+        await using var harness = SqlServerDataQLServiceE2eTestHarness.Create(_fixture);
+
+        var having = QueryFilterBuilder.Not(
+            QueryFilterBuilder.Field("employees").Lt(2));
+
+        var response = await harness.Service.ExecuteAsync<DepartmentCountRow>(
+            SqlServerTestEnvironment.SourceKey,
+            "Employees",
+            new QueryRequest
+            {
+                Order = [new OrderClause { Field = "Department", Direction = "asc" }],
+                Group = new GroupRequest
+                {
+                    GroupBy = ["Department"],
+                    Metrics =
+                    [
+                        new GroupMetricRequest
+                        {
+                            Field = "*",
+                            Operation = "count",
+                            Alias = "employees"
+                        }
+                    ],
+                    Having = having.ToJsonElement()
+                }
+            });
+
+        Assert.Single(response.Results);
+        Assert.Equal("Engineering", response.Results[0].Department);
+        Assert.Equal(3, response.Results[0].Employees);
+    }
+
+    [SqlServerAvailableFact]
     public async Task ExecuteAsync_WithUnsupportedFirstMetric_ThrowsAstValidationException()
     {
         await using var harness = SqlServerDataQLServiceE2eTestHarness.Create(_fixture);

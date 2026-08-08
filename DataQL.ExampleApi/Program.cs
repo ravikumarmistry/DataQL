@@ -287,7 +287,11 @@ CREATE TABLE IF NOT EXISTS Employees (
 	Department TEXT NOT NULL,
 	IsActive INTEGER NOT NULL,
 	CreatedAt TEXT NOT NULL,
-	Notes TEXT NULL
+	Notes TEXT NULL,
+	Tags TEXT NULL,
+	Skills TEXT NULL,
+	Address TEXT NULL,
+	Projects TEXT NULL
 );";
 	await createTable.ExecuteNonQueryAsync();
 
@@ -301,11 +305,25 @@ CREATE TABLE IF NOT EXISTS Employees (
 
 	await using var seedCommand = connection.CreateCommand();
 	seedCommand.CommandText = @"
-INSERT INTO Employees (Id, Name, Age, City, Department, IsActive, CreatedAt, Notes) VALUES
-(1, 'Asha', 19, 'Delhi', 'Engineering', 1, '2025-01-10T10:00:00Z', 'junior'),
-(2, 'Arun', 24, 'Bengaluru', 'Engineering', 1, '2025-01-11T10:00:00Z', NULL),
-(3, 'Riya', 31, 'Delhi', 'Sales', 1, '2025-01-12T10:00:00Z', 'lead'),
-(4, 'Karan', 22, 'Pune', 'Engineering', 0, '2025-01-13T10:00:00Z', NULL);";
+INSERT INTO Employees
+	(Id, Name, Age, City, Department, IsActive, CreatedAt, Notes, Tags, Skills, Address, Projects)
+VALUES
+(1, 'Asha', 19, 'Delhi', 'Engineering', 1, '2025-01-10T10:00:00Z', 'junior',
+ '[""junior"",""remote""]', '[""C#"","".NET""]',
+ '{""City"":""Delhi"",""Country"":""India""}',
+ '[{""Name"":""Alpha"",""Status"":""Active"",""Hours"":30}]'),
+(2, 'Arun', 24, 'Bengaluru', 'Engineering', 1, '2025-01-11T10:00:00Z', NULL,
+ '[""senior""]', '[""Java"",""Azure""]',
+ '{""City"":""Bengaluru"",""Country"":""India""}',
+ '[{""Name"":""Beta"",""Status"":""Done"",""Hours"":10}]'),
+(3, 'Riya', 31, 'Delhi', 'Sales', 1, '2025-01-12T10:00:00Z', 'lead',
+ '[""lead"",""remote"",""sales""]', '[""Azure"","".NET"",""SQL""]',
+ '{""City"":""Delhi"",""Country"":""India""}',
+ '[{""Name"":""Gamma"",""Status"":""Active"",""Hours"":25},{""Name"":""Delta"",""Status"":""Active"",""Hours"":5}]'),
+(4, 'Karan', 22, 'Pune', 'Engineering', 0, '2025-01-13T10:00:00Z', NULL,
+ '[]', '[]',
+ '{""City"":""Pune"",""Country"":""India""}',
+ '[]');";
 	await seedCommand.ExecuteNonQueryAsync();
 }
 

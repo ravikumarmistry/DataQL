@@ -37,6 +37,39 @@ public class SqlServerDataQLServiceFiltersE2eTests
         Assert.NotNull(response.Meta);
         Assert.Equal("SqlServer", response.Meta.Provider);
         Assert.True(response.Meta.ExecutionTimeMs >= 0);
+
+        Assert.Contains(
+            harness.LogMessages,
+            m => m.Contains("SqlServerQueryExecutor", StringComparison.Ordinal)
+                && m.Contains("rows", StringComparison.Ordinal)
+                && m.Contains("@p0=21", StringComparison.Ordinal));
+        Assert.Contains(
+            harness.LogMessages,
+            m => m.Contains("SqlServerQueryExecutor", StringComparison.Ordinal)
+                && m.Contains("count", StringComparison.Ordinal)
+                && m.Contains("@p0=21", StringComparison.Ordinal));
+    }
+
+    [SqlServerAvailableFact]
+    public async Task ExecuteAsync_WithoutWhere_LogsEmptyParameterBag()
+    {
+        await using var harness = SqlServerDataQLServiceE2eTestHarness.Create(_fixture);
+
+        var response = await harness.Service.ExecuteAsync<EmployeeRow>(
+            SqlServerTestEnvironment.SourceKey,
+            "Employees",
+            new QueryRequest
+            {
+                Order = [new OrderClause { Field = "Name", Direction = "asc" }],
+                Limit = 1
+            });
+
+        Assert.Single(response.Results);
+        Assert.Contains(
+            harness.LogMessages,
+            m => m.Contains("SqlServerQueryExecutor", StringComparison.Ordinal)
+                && m.Contains("rows", StringComparison.Ordinal)
+                && m.Contains("| Parameters: {}", StringComparison.Ordinal));
     }
 
     [SqlServerAvailableFact]
@@ -278,7 +311,75 @@ public class SqlServerDataQLServiceFiltersE2eTests
         Assert.Equal("SqlServer", error.Provider);
     }
 
+    [SqlServerAvailableFact]
+    public async Task ExecuteAsync_ContainsAny_MatchesAnyTag()
+    {
+        var where = System.Text.Json.JsonDocument.Parse(
+            """{"Tags":{"$containsAny":["remote","missing"]}}""").RootElement.Clone();
+        var names = await QueryNamesAsync(where);
+        Assert.Equal(["Asha", "Riya"], names);
+    }
+
+    [SqlServerAvailableFact]
+    public async Task ExecuteAsync_ContainsAll_MatchesAllSkills()
+    {
+        var where = System.Text.Json.JsonDocument.Parse(
+            """{"Skills":{"$containsAll":["Azure",".NET"]}}""").RootElement.Clone();
+        var names = await QueryNamesAsync(where);
+        Assert.Equal(["Riya"], names);
+    }
+
+    [SqlServerAvailableFact]
+    public async Task ExecuteAsync_Size_MatchesTagCount()
+    {
+        var where = System.Text.Json.JsonDocument.Parse(
+            """{"Tags":{"$size":2}}""").RootElement.Clone();
+        var names = await QueryNamesAsync(where);
+        Assert.Equal(["Asha"], names);
+    }
+
+    [SqlServerAvailableFact]
+    public async Task ExecuteAsync_IsEmptyTrue_MatchesEmptyTags()
+    {
+        var where = System.Text.Json.JsonDocument.Parse(
+            """{"Tags":{"$isEmpty":true}}""").RootElement.Clone();
+        var names = await QueryNamesAsync(where);
+        Assert.Equal(["Karan"], names);
+    }
+
+    [SqlServerAvailableFact]
+    public async Task ExecuteAsync_IsEmptyFalse_MatchesNonEmptyTags()
+    {
+        var where = System.Text.Json.JsonDocument.Parse(
+            """{"Tags":{"$isEmpty":false}}""").RootElement.Clone();
+        var names = await QueryNamesAsync(where);
+        Assert.Equal(["Arun", "Asha", "Riya"], names);
+    }
+
+    [SqlServerAvailableFact]
+    public async Task ExecuteAsync_NestedAddressCity_MatchesJsonValue()
+    {
+        var where = System.Text.Json.JsonDocument.Parse(
+            """{"Address.City":"Delhi"}""").RootElement.Clone();
+        var names = await QueryNamesAsync(where);
+        Assert.Equal(["Asha", "Riya"], names);
+    }
+
+    [SqlServerAvailableFact]
+    public async Task ExecuteAsync_Any_MatchesActiveProjectWithHoursOverTwenty()
+    {
+        var where = System.Text.Json.JsonDocument.Parse(
+            """{"Projects":{"$any":{"Status":"Active","Hours":{"$gt":20}}}}""").RootElement.Clone();
+        var names = await QueryNamesAsync(where);
+        Assert.Equal(["Asha", "Riya"], names);
+    }
+
     private async Task<IReadOnlyList<string>> QueryNamesAsync(QueryFilter filter)
+    {
+        return await QueryNamesAsync(filter.ToJsonElement());
+    }
+
+    private async Task<IReadOnlyList<string>> QueryNamesAsync(System.Text.Json.JsonElement where)
     {
         await using var harness = SqlServerDataQLServiceE2eTestHarness.Create(_fixture);
 
@@ -287,7 +388,7 @@ public class SqlServerDataQLServiceFiltersE2eTests
             "Employees",
             new QueryRequest
             {
-                Where = filter.ToJsonElement(),
+                Where = where,
                 Order = [new OrderClause { Field = "Name", Direction = "asc" }]
             });
 

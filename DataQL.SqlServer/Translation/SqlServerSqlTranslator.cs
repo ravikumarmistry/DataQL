@@ -218,13 +218,17 @@ public sealed class SqlServerSqlTranslator
         FilterExpression node,
         IDictionary<string, object?> parameters,
         ref int parameterIndex,
-        string alias)
+        string alias,
+        string? jsonDocumentExpression = null)
     {
         return node switch
         {
-            FieldFilter fieldFilter => BuildFieldFilter(fieldFilter, parameters, ref parameterIndex, alias),
-            LogicalFilter logical => BuildLogical(logical, parameters, ref parameterIndex, alias),
-            NotFilter notNode => "NOT (" + BuildClause(notNode.Child, parameters, ref parameterIndex, alias) + ")",
+            FieldFilter fieldFilter => BuildFieldFilter(
+                fieldFilter, parameters, ref parameterIndex, alias, jsonDocumentExpression),
+            LogicalFilter logical => BuildLogical(
+                logical, parameters, ref parameterIndex, alias, jsonDocumentExpression),
+            NotFilter notNode => "NOT (" + BuildClause(
+                notNode.Child, parameters, ref parameterIndex, alias, jsonDocumentExpression) + ")",
             _ => throw new NotSupportedException($"Unsupported filter node: {node.GetType().Name}")
         };
     }
@@ -233,7 +237,8 @@ public sealed class SqlServerSqlTranslator
         LogicalFilter logical,
         IDictionary<string, object?> parameters,
         ref int parameterIndex,
-        string alias)
+        string alias,
+        string? jsonDocumentExpression = null)
     {
         if (logical.Children.Count == 0)
         {
@@ -244,7 +249,7 @@ public sealed class SqlServerSqlTranslator
         var parts = new List<string>();
         foreach (var child in logical.Children)
         {
-            parts.Add("(" + BuildClause(child, parameters, ref parameterIndex, alias) + ")");
+            parts.Add("(" + BuildClause(child, parameters, ref parameterIndex, alias, jsonDocumentExpression) + ")");
         }
 
         return string.Join(" " + op + " ", parts);
@@ -254,14 +259,15 @@ public sealed class SqlServerSqlTranslator
         FieldFilter filter,
         IDictionary<string, object?> parameters,
         ref int parameterIndex,
-        string alias)
+        string alias,
+        string? jsonDocumentExpression = null)
     {
         if (filter.Operations.Count == 0)
         {
             return "1 = 1";
         }
 
-        var field = BuildFieldReference(filter.Field.Value, alias);
+        var field = BuildFieldReference(filter.Field.Value, alias, jsonDocumentExpression);
         var parts = new List<string>();
         foreach (var operation in filter.Operations)
         {
@@ -284,7 +290,7 @@ public sealed class SqlServerSqlTranslator
             ListOperation list => BuildListOperation(field, list, parameters, ref parameterIndex),
             BooleanOperation boolean => BuildBooleanOperation(field, boolean),
             IntegerOperation integer => BuildIntegerOperation(field, integer, parameters, ref parameterIndex),
-            AnyOperation any => BuildAnyOperation(field, any.Predicate, parameters, ref parameterIndex, alias),
+            AnyOperation any => BuildAnyOperation(field, any.Predicate, parameters, ref parameterIndex),
             _ => throw new NotSupportedException($"Unsupported operation type: {operation.GetType().Name}")
         };
     }
@@ -387,20 +393,35 @@ public sealed class SqlServerSqlTranslator
         string field,
         FilterExpression predicate,
         IDictionary<string, object?> parameters,
-        ref int parameterIndex,
-        string alias)
+        ref int parameterIndex)
     {
         var itemAlias = "[a" + parameterIndex + "]";
-        var predicateClause = BuildClause(predicate, parameters, ref parameterIndex, itemAlias);
-        return "EXISTS (SELECT 1 FROM OPENJSON(" + field + ") WITH ([value] NVARCHAR(MAX) '$' AS JSON) AS " + itemAlias + " WHERE " + predicateClause + ")";
+        var jsonDocumentExpression = itemAlias + ".[value]";
+        var predicateClause = BuildClause(
+            predicate,
+            parameters,
+            ref parameterIndex,
+            alias: string.Empty,
+            jsonDocumentExpression);
+        return "EXISTS (SELECT 1 FROM OPENJSON(" + field + ") WITH ([value] NVARCHAR(MAX) '$' AS JSON) AS "
+            + itemAlias + " WHERE " + predicateClause + ")";
     }
 
-    private static string BuildFieldReference(string dottedPath, string alias)
+    private static string BuildFieldReference(
+        string dottedPath,
+        string alias,
+        string? jsonDocumentExpression = null)
     {
         var parts = dottedPath.Split('.', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 0)
         {
             throw new ArgumentException("Field path cannot be empty.", nameof(dottedPath));
+        }
+
+        if (jsonDocumentExpression is not null)
+        {
+            var nestedPath = "$" + string.Concat(parts.Select(p => "." + p));
+            return "JSON_VALUE(" + jsonDocumentExpression + ", '" + nestedPath + "')";
         }
 
         if (parts.Length == 1)

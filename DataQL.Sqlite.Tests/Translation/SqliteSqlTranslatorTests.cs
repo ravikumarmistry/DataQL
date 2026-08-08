@@ -156,6 +156,23 @@ public class SqliteSqlTranslatorTests
     }
 
     [Fact]
+    public void Translate_WithLastMetric_ThrowsNotSupportedException()
+    {
+        var translator = new SqliteSqlTranslator();
+        var ast = new QueryAst(
+            null,
+            new ProjectionAst([], [], []),
+            [],
+            new PaginationAst(null, null, false, false),
+            new GroupAst(
+                [new FieldPath("Department")],
+                [new GroupMetricAst(new FieldPath("Age"), GroupMetricOperation.Last, "lastAge")]));
+
+        var ex = Assert.Throws<NotSupportedException>(() => translator.Translate(ast, "Employees"));
+        Assert.Contains("last", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Translate_WithDistinct_BuildsSelectDistinctOverAllDistinctFields()
     {
         var translator = new SqliteSqlTranslator();

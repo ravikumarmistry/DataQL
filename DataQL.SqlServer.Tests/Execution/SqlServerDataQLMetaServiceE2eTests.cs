@@ -52,6 +52,14 @@ public class SqlServerDataQLMetaServiceE2eTests
         Assert.Equal("string", nameProperty.GetProperty("type").GetString());
         Assert.True(properties.TryGetProperty("Age", out var ageProperty));
         Assert.Equal("integer", ageProperty.GetProperty("type").GetString());
+        Assert.True(properties.TryGetProperty("IsActive", out var isActiveProperty));
+        Assert.Equal("boolean", isActiveProperty.GetProperty("type").GetString());
+        Assert.True(properties.TryGetProperty("CreatedAt", out var createdAtProperty));
+        Assert.Equal("string", createdAtProperty.GetProperty("type").GetString());
+        Assert.Equal("date-time", createdAtProperty.GetProperty("format").GetString());
+        Assert.True(properties.TryGetProperty("Tags", out var tagsProperty));
+        Assert.Equal("string", tagsProperty.GetProperty("type").GetString());
+        Assert.True(properties.TryGetProperty("Projects", out _));
     }
 
     [SqlServerAvailableFact]

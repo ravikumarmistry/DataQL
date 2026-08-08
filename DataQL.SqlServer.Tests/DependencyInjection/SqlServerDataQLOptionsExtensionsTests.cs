@@ -31,4 +31,21 @@ public class SqlServerDataQLOptionsExtensionsTests
         Assert.Throws<ArgumentNullException>(() =>
             options.AddSqlServerSource("sample", null!));
     }
+
+    [Fact]
+    public void AddSqlServerSource_RegistersQueryExecutorWithLogger()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddDataQL(options =>
+            options.AddSqlServerSource("sample", _ => null!));
+
+        using var provider = services.BuildServiceProvider();
+        var executor = provider.GetRequiredService<DataQL.SqlServer.Execution.ISqlServerQueryExecutor>();
+        var engine = provider.GetRequiredService<DataQL.SqlServer.Execution.SqlServerQueryExecutionEngine>();
+
+        Assert.NotNull(executor);
+        Assert.NotNull(engine);
+        Assert.IsType<DataQL.SqlServer.Execution.SqlServerQueryExecutor>(executor);
+    }
 }
