@@ -11,6 +11,11 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
 jobs:
   build-and-test:
     name: Build and test
@@ -34,4 +39,16 @@ jobs:
         run: dotnet build DataQL.sln -c Release --no-restore
 
       - name: Test
-        run: dotnet test DataQL.sln -c Release --no-build --verbosity normal
+        run: >
+          dotnet test DataQL.sln -c Release --no-build --verbosity normal
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+
+      - name: Test report
+        uses: dorny/test-reporter@v2
+        if: always()
+        with:
+          name: Unit tests
+          path: TestResults/**/*.trx
+          reporter: dotnet-trx
+          fail-on-error: true
