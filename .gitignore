@@ -34,6 +34,7 @@ coverage*.json
 coverage*.xml
 
 # NuGet
+artifacts/
 *.nupkg
 *.snupkg
 packages/
