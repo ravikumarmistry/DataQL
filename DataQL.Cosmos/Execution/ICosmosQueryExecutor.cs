@@ -14,11 +14,22 @@ public interface ICosmosQueryExecutor
         int? maxItemCount,
         string? feedContinuationToken,
         CancellationToken cancellationToken = default);
+
+    Task<CosmosCountResult> ExecuteCountAsync(
+        Container container,
+        CosmosSqlTranslationResult translation,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class CosmosQueryPageResult<T>
 {
     public required IReadOnlyList<T> Items { get; init; }
     public string? ContinuationToken { get; init; }
+    public double RequestCharge { get; init; }
+}
+
+public sealed class CosmosCountResult
+{
+    public required long Count { get; init; }
     public double RequestCharge { get; init; }
 }

@@ -12,6 +12,46 @@ public sealed class CosmosQueryTranslator : IQueryProviderTranslator
     public ProviderCapabilities Capabilities { get; } = new()
     {
         Provider = ProviderName.Cosmos,
+        Description = "Azure Cosmos DB document provider with feed-token paging, nested fields, and best-effort grouping.",
+        Notes =
+        [
+            new CapabilityNote
+            {
+                Code = "Order.Optional",
+                Severity = "info",
+                Message = "order is not required on every query; it is required when a continuation token is supplied."
+            },
+            new CapabilityNote
+            {
+                Code = "Paging.FeedToken",
+                Severity = "info",
+                Message = "Non-group continuation uses Cosmos feed tokens. Do not change the request shape between pages."
+            },
+            new CapabilityNote
+            {
+                Code = "Group.NoContinuation",
+                Severity = "restriction",
+                Message = "Grouped queries return the full aggregate set: no continuation token, and limit is ignored."
+            },
+            new CapabilityNote
+            {
+                Code = "Group.OrderClientSide",
+                Severity = "warning",
+                Message = "When order is provided with group, results are sorted in-memory after aggregation."
+            },
+            new CapabilityNote
+            {
+                Code = "Count.ExtraQuery",
+                Severity = "warning",
+                Message = "includeCount runs a separate COUNT query; RUs are reported as _meta.countRequestCharge."
+            },
+            new CapabilityNote
+            {
+                Code = "Schema.BestEffort",
+                Severity = "info",
+                Message = "Container schema metadata is a minimal object stub; Cosmos is schemaless."
+            }
+        ],
         SupportedOperators = new HashSet<string>
         {
             "$eq", "$ne", "$gt", "$gte", "$lt", "$lte",

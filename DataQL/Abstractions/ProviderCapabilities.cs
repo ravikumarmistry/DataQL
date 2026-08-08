@@ -5,6 +5,11 @@ namespace DataQL.Abstractions;
 public sealed class ProviderCapabilities
 {
     public string Provider { get; init; } = string.Empty;
+
+    public string? Description { get; init; }
+
+    public IReadOnlyList<CapabilityNote> Notes { get; init; } = [];
+
     public ISet<string> SupportedOperators { get; init; } = new HashSet<string>();
 
     public bool SupportsSelect { get; init; }

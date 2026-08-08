@@ -52,9 +52,9 @@ public class CosmosSqlTranslatorTests
 
         var result = translator.Translate(filter);
 
-        Assert.Contains("CONTAINS(c.name, @p0)", result.Sql);
-        Assert.Contains("STARTSWITH(c.name, @p1)", result.Sql);
-        Assert.Contains("ENDSWITH(c.name, @p2)", result.Sql);
+        Assert.Contains("CONTAINS(c.name, @p0, true)", result.Sql);
+        Assert.Contains("STARTSWITH(c.name, @p1, true)", result.Sql);
+        Assert.Contains("ENDSWITH(c.name, @p2, true)", result.Sql);
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public class CosmosSqlTranslatorTests
         var result = translator.Translate(filter);
 
         Assert.Contains("IS_DEFINED(c.deletedAt)", result.Sql);
-        Assert.Contains("NOT IS_NULL(c.deletedAt)", result.Sql);
+        Assert.Contains("(IS_DEFINED(c.deletedAt) AND NOT IS_NULL(c.deletedAt))", result.Sql);
     }
 
     [Fact]
@@ -113,5 +113,23 @@ public class CosmosSqlTranslatorTests
         Assert.Contains("FROM", result.Sql);
         Assert.Contains("IN c.projects", result.Sql);
         Assert.Contains("hours >", result.Sql);
+    }
+
+    [Fact]
+    public void TranslateCount_WithWhere_BuildsCountSql()
+    {
+        var translator = new CosmosSqlTranslator();
+        var ast = new QueryAst(
+            new FieldFilter(new FieldPath("Age"), [new ScalarOperation(FieldOperator.Gte, new ScalarValue(21))]),
+            new ProjectionAst([], [], []),
+            [new SortField(new FieldPath("Age"), SortDirection.Desc)],
+            new PaginationAst(2, null, false, true),
+            null);
+
+        var result = translator.TranslateCount(ast);
+
+        Assert.Equal("SELECT VALUE COUNT(1) FROM c WHERE c.Age >= @p0", result.Sql);
+        Assert.Equal(21, result.Parameters["@p0"]);
+        Assert.DoesNotContain("ORDER BY", result.Sql, StringComparison.OrdinalIgnoreCase);
     }
 }

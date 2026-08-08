@@ -54,17 +54,29 @@ public sealed class CosmosE2eFixture : IAsyncLifetime
         string? notes,
         string createdAt)
     {
-        var doc = new
-        {
-            id,
-            Name = name,
-            Age = age,
-            City = city,
-            Department = department,
-            IsActive = isActive,
-            Notes = notes,
-            CreatedAt = createdAt
-        };
+        // Omit null Notes so $exists:false matches documents without the property (Sqlite NULL semantics).
+        object doc = notes is null
+            ? new
+            {
+                id,
+                Name = name,
+                Age = age,
+                City = city,
+                Department = department,
+                IsActive = isActive,
+                CreatedAt = createdAt
+            }
+            : new
+            {
+                id,
+                Name = name,
+                Age = age,
+                City = city,
+                Department = department,
+                IsActive = isActive,
+                Notes = notes,
+                CreatedAt = createdAt
+            };
         return container.UpsertItemAsync(doc, new PartitionKey(id));
     }
 }

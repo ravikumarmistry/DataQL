@@ -6,7 +6,7 @@ namespace DataQL.Tests.Validation;
 public class QueryRequestValidatorTests
 {
     [Fact]
-    public void Validate_WhenOrderMissing_ReturnsError()
+    public void Validate_WhenOrderMissing_ReturnsSuccess()
     {
         var validator = new QueryRequestValidator();
         var request = new QueryRequest
@@ -16,8 +16,7 @@ public class QueryRequestValidatorTests
 
         var result = validator.Validate(request);
 
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.Code == "Order.Required");
+        Assert.True(result.IsValid);
     }
 
     [Fact]

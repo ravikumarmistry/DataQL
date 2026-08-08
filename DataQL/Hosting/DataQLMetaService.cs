@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataQL.Abstractions;
 using DataQL.Contracts;
 
 namespace DataQL;
@@ -37,7 +38,18 @@ public sealed class DataQLMetaService : IDataQLMetaService
 
         IReadOnlyList<DataQLSourceInfo> sources = _options.Sources
             .OrderBy(static pair => pair.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(static pair => new DataQLSourceInfo(pair.Key, pair.Value.Provider))
+            .Select(pair =>
+            {
+                _executors.TryGetValue(pair.Value.Provider, out var executor);
+                var capabilities = executor?.Capabilities;
+                return new DataQLSourceInfo
+                {
+                    Key = pair.Key,
+                    Provider = pair.Value.Provider,
+                    Description = capabilities?.Description,
+                    Capabilities = capabilities is null ? null : ToCapabilitiesInfo(capabilities)
+                };
+            })
             .ToList();
 
         return Task.FromResult(sources);
@@ -95,5 +107,30 @@ public sealed class DataQLMetaService : IDataQLMetaService
         }
 
         return (registration, executor);
+    }
+
+    private static DataQLProviderCapabilitiesInfo ToCapabilitiesInfo(ProviderCapabilities capabilities)
+    {
+        return new DataQLProviderCapabilitiesInfo
+        {
+            Provider = capabilities.Provider,
+            Description = capabilities.Description,
+            SupportedOperators = capabilities.SupportedOperators.OrderBy(static o => o, StringComparer.Ordinal).ToList(),
+            SupportsSelect = capabilities.SupportsSelect,
+            SupportsExclude = capabilities.SupportsExclude,
+            SupportsGrouping = capabilities.SupportsGrouping,
+            SupportsHaving = capabilities.SupportsHaving,
+            SupportsNestedFields = capabilities.SupportsNestedFields,
+            SupportsDistinct = capabilities.SupportsDistinct,
+            SupportedGroupOperations = capabilities.SupportedGroupOperations.OrderBy(static o => o, StringComparer.Ordinal).ToList(),
+            Notes = capabilities.Notes
+                .Select(static n => new DataQLCapabilityNoteInfo
+                {
+                    Code = n.Code,
+                    Severity = n.Severity,
+                    Message = n.Message
+                })
+                .ToList()
+        };
     }
 }

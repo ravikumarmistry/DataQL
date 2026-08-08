@@ -13,6 +13,7 @@ using DataQL.Ast.Model;
 using DataQL.Contracts;
 using DataQL.Pipeline;
 using DataQL.SqlServer.Translation;
+using DataQL.SqlServer.Validation;
 using DataQL.Token;
 using DataQL.Validation;
 
@@ -28,6 +29,7 @@ public sealed class SqlServerQueryExecutionEngine
     private readonly IContinuationTokenProtector _tokenProtector;
     private readonly ProviderCapabilities _capabilities;
     private readonly IProviderCapabilityValidator _capabilityValidator;
+    private readonly IProviderQueryValidator _providerValidator;
 
     public SqlServerQueryExecutionEngine(
         QueryProcessor? processor = null,
@@ -35,7 +37,8 @@ public sealed class SqlServerQueryExecutionEngine
         ISqlServerQueryExecutor? executor = null,
         IContinuationTokenProtector? tokenProtector = null,
         ProviderCapabilities? capabilities = null,
-        IProviderCapabilityValidator? capabilityValidator = null)
+        IProviderCapabilityValidator? capabilityValidator = null,
+        IProviderQueryValidator? providerValidator = null)
     {
         _processor = processor ?? new QueryProcessor(
             new QueryRequestValidator(),
@@ -46,6 +49,7 @@ public sealed class SqlServerQueryExecutionEngine
         _tokenProtector = tokenProtector ?? new Base64ContinuationTokenProtector();
         _capabilities = capabilities ?? new SqlServerQueryTranslator().Capabilities;
         _capabilityValidator = capabilityValidator ?? ProviderCapabilityValidator.Instance;
+        _providerValidator = providerValidator ?? SqlServerProviderQueryValidator.Instance;
     }
 
     public async Task<QueryResponse<T>> ExecuteAsync<T>(
@@ -68,6 +72,7 @@ public sealed class SqlServerQueryExecutionEngine
 
         var ast = _processor.Process(request);
         _capabilityValidator.EnsureValid(ast, _capabilities);
+        _providerValidator.EnsureValid(ast, request, _capabilities);
         var tableName = source.Name;
         var queryShapeHash = BuildQueryShapeHash(tableName, request);
         var tokenPayload = DecodeSeekTokenOrThrow(request.ContinuationToken, queryShapeHash, request.Order);

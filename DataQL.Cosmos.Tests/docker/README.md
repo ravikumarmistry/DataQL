@@ -12,4 +12,4 @@ dotnet test ..
 
 Uses the Linux Cosmos emulator (`vnext-preview`) on port **8081** with the well-known emulator key from `.env.example`.
 
-The test fixture creates database `DataQL`, container `Employees`, and seeds sample documents (aligned with `testdata/Employees.json`).
+The test fixture (`CosmosE2eFixture`) owns seeding: it creates database `DataQL`, container `Employees`, and upserts sample documents (aligned with `testdata/Employees.json`). Docker Compose only starts the empty emulator.

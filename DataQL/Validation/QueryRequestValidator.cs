@@ -17,11 +17,6 @@ public sealed class QueryRequestValidator : IQueryValidator
     {
         var errors = new List<ValidationError>();
 
-        if (request.Order.Count == 0)
-        {
-            errors.Add(new ValidationError("order", "Order.Required", "order must contain at least one sort field."));
-        }
-
         if (request.Limit is < 1)
         {
             errors.Add(new ValidationError("limit", "Limit.OutOfRange", "limit must be greater than 0 when provided."));

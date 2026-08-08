@@ -9,6 +9,8 @@ public interface IDataQLProviderExecutor
 {
     string Provider { get; }
 
+    ProviderCapabilities Capabilities { get; }
+
     Task<QueryResponse<T>> ExecuteAsync<T>(
         IDataQLSession session,
         QuerySource source,

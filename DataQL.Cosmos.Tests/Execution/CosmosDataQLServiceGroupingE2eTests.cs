@@ -44,6 +44,40 @@ public class CosmosDataQLServiceGroupingE2eTests
         Assert.Equal(3, response.Results[0].Employees);
         Assert.Equal("Sales", response.Results[1].Department);
         Assert.Equal(1, response.Results[1].Employees);
+        Assert.False(response.HasMore);
+        Assert.Null(response.ContinuationToken);
+    }
+
+    [CosmosAvailableFact]
+    public async Task ExecuteAsync_WithGroupByAndLimit_IgnoresLimitAndReturnsAllGroups()
+    {
+        await using var harness = CosmosDataQLServiceE2eTestHarness.Create(_fixture);
+
+        var response = await harness.Service.ExecuteAsync<DepartmentCountRow>(
+            CosmosTestEnvironment.SourceKey,
+            CosmosTestEnvironment.ContainerId,
+            new QueryRequest
+            {
+                Limit = 1,
+                Order = [new OrderClause { Field = "Department", Direction = "asc" }],
+                Group = new GroupRequest
+                {
+                    GroupBy = ["Department"],
+                    Metrics =
+                    [
+                        new GroupMetricRequest
+                        {
+                            Field = "*",
+                            Operation = "count",
+                            Alias = "Employees"
+                        }
+                    ]
+                }
+            });
+
+        Assert.Equal(2, response.Results.Count);
+        Assert.False(response.HasMore);
+        Assert.Null(response.ContinuationToken);
     }
 
     private sealed class DepartmentCountRow

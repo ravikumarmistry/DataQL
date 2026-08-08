@@ -14,8 +14,11 @@ public sealed class CosmosDataQLProviderExecutor(
 {
     private readonly CosmosQueryExecutionEngine _engine = engine;
     private readonly CosmosMetadataProvider _metadata = new();
+    private readonly ProviderCapabilities _capabilities = new DataQL.Cosmos.CosmosQueryTranslator().Capabilities;
 
     public string Provider => ProviderName.Cosmos;
+
+    public ProviderCapabilities Capabilities => _capabilities;
 
     public Task<QueryResponse<T>> ExecuteAsync<T>(
         IDataQLSession session,

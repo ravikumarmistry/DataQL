@@ -15,8 +15,11 @@ public sealed class SqlServerDataQLProviderExecutor(
 {
     private readonly SqlServerQueryExecutionEngine _engine = engine;
     private readonly SqlServerMetadataProvider _metadata = new();
+    private readonly ProviderCapabilities _capabilities = new DataQL.SqlServer.SqlServerQueryTranslator().Capabilities;
 
     public string Provider => ProviderName.SqlServer;
+
+    public ProviderCapabilities Capabilities => _capabilities;
 
     public Task<QueryResponse<T>> ExecuteAsync<T>(
         IDataQLSession session,

@@ -33,6 +33,34 @@ public sealed class CosmosSqlTranslator
         };
     }
 
+    /// <summary>
+    /// Builds <c>SELECT VALUE COUNT(1) FROM c</c> (+ WHERE). Ignores order, limit, select, and group.
+    /// </summary>
+    public CosmosSqlTranslationResult TranslateCount(QueryAst queryAst)
+    {
+        ArgumentNullException.ThrowIfNull(queryAst);
+        if (queryAst.Group is not null)
+        {
+            throw new NotSupportedException("Cosmos count translation does not support grouped queries.");
+        }
+
+        var parameters = new Dictionary<string, object?>();
+        var parameterIndex = 0;
+        var sql = "SELECT VALUE COUNT(1) FROM c";
+
+        if (queryAst.Where is not null)
+        {
+            var whereClause = BuildClause(queryAst.Where, parameters, ref parameterIndex, alias: "c");
+            sql += " WHERE " + whereClause;
+        }
+
+        return new CosmosSqlTranslationResult
+        {
+            Sql = sql,
+            Parameters = parameters
+        };
+    }
+
     private static CosmosSqlTranslationResult TranslateNonGrouped(
         QueryAst queryAst,
         IDictionary<string, object?> parameters,
@@ -247,9 +275,9 @@ public sealed class CosmosSqlTranslator
 
         return operation.Operator switch
         {
-            FieldOperator.Contains => $"CONTAINS({field}, {paramName})",
-            FieldOperator.StartsWith => $"STARTSWITH({field}, {paramName})",
-            FieldOperator.EndsWith => $"ENDSWITH({field}, {paramName})",
+            FieldOperator.Contains => $"CONTAINS({field}, {paramName}, true)",
+            FieldOperator.StartsWith => $"STARTSWITH({field}, {paramName}, true)",
+            FieldOperator.EndsWith => $"ENDSWITH({field}, {paramName}, true)",
             FieldOperator.Regex => $"RegexMatch({field}, {paramName})",
             _ => $"{field} {sqlOp} {paramName}"
         };
@@ -287,8 +315,8 @@ public sealed class CosmosSqlTranslator
                 ? $"IS_DEFINED({field})"
                 : $"NOT IS_DEFINED({field})",
             FieldOperator.IsNull => operation.Value
-                ? $"IS_NULL({field})"
-                : $"NOT IS_NULL({field})",
+                ? $"(NOT IS_DEFINED({field}) OR IS_NULL({field}))"
+                : $"(IS_DEFINED({field}) AND NOT IS_NULL({field}))",
             FieldOperator.IsEmpty => operation.Value
                 ? $"ARRAY_LENGTH({field}) = 0"
                 : $"ARRAY_LENGTH({field}) > 0",

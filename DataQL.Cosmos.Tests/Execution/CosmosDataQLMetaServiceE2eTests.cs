@@ -23,6 +23,9 @@ public class CosmosDataQLMetaServiceE2eTests
         Assert.Single(sources);
         Assert.Equal(CosmosTestEnvironment.SourceKey, sources[0].Key);
         Assert.Equal(ProviderName.Cosmos, sources[0].Provider);
+        Assert.False(string.IsNullOrWhiteSpace(sources[0].Description));
+        Assert.NotNull(sources[0].Capabilities);
+        Assert.Contains(sources[0].Capabilities!.Notes, n => n.Code == "Group.NoContinuation");
     }
 
     [CosmosAvailableFact]

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataQL.Cosmos.Translation;
@@ -25,11 +26,7 @@ public sealed class CosmosQueryExecutor(
             throw new NotSupportedException("Cosmos grouped queries do not support continuation tokens.");
         }
 
-        var definition = new QueryDefinition(translation.Sql);
-        foreach (var pair in translation.Parameters)
-        {
-            definition = definition.WithParameter(pair.Key, pair.Value);
-        }
+        var definition = BuildDefinition(translation);
 
         _logger?.LogInformation(
             "DataQL Cosmos query: {Sql} | MaxItemCount={MaxItemCount} | HasFeedToken={HasFeedToken} | Grouped={Grouped}",
@@ -38,10 +35,10 @@ public sealed class CosmosQueryExecutor(
             !string.IsNullOrWhiteSpace(feedContinuationToken),
             translation.IsGrouped);
 
-        // GROUP BY cannot use feed continuation; drain the iterator without reading ContinuationToken.
+        // GROUP BY: drain all results; limit/MaxItemCount has no effect; no continuation token.
         if (translation.IsGrouped)
         {
-            return await ExecuteGroupedAsync<T>(container, definition, maxItemCount, cancellationToken);
+            return await ExecuteGroupedAsync<T>(container, definition, cancellationToken);
         }
 
         using var iterator = container.GetItemQueryIterator<T>(
@@ -74,18 +71,58 @@ public sealed class CosmosQueryExecutor(
         };
     }
 
+    public async Task<CosmosCountResult> ExecuteCountAsync(
+        Container container,
+        CosmosSqlTranslationResult translation,
+        CancellationToken cancellationToken = default)
+    {
+        if (translation.IsGrouped)
+        {
+            throw new NotSupportedException("Cosmos grouped queries do not support includeCount.");
+        }
+
+        var definition = BuildDefinition(translation);
+
+        _logger?.LogInformation("DataQL Cosmos count query: {Sql}", translation.Sql);
+
+        using var iterator = container.GetItemQueryIterator<long>(definition);
+        double requestCharge = 0;
+        long count = 0;
+
+        while (iterator.HasMoreResults)
+        {
+            var response = await iterator.ReadNextAsync(cancellationToken);
+            requestCharge += response.RequestCharge;
+            if (response.Count > 0)
+            {
+                count = response.Resource.FirstOrDefault();
+            }
+        }
+
+        return new CosmosCountResult
+        {
+            Count = count,
+            RequestCharge = requestCharge
+        };
+    }
+
+    private static QueryDefinition BuildDefinition(CosmosSqlTranslationResult translation)
+    {
+        var definition = new QueryDefinition(translation.Sql);
+        foreach (var pair in translation.Parameters)
+        {
+            definition = definition.WithParameter(pair.Key, pair.Value);
+        }
+
+        return definition;
+    }
+
     private static async Task<CosmosQueryPageResult<T>> ExecuteGroupedAsync<T>(
         Container container,
         QueryDefinition definition,
-        int? maxItemCount,
         CancellationToken cancellationToken)
     {
-        using var iterator = container.GetItemQueryIterator<T>(
-            definition,
-            requestOptions: new QueryRequestOptions
-            {
-                MaxItemCount = maxItemCount
-            });
+        using var iterator = container.GetItemQueryIterator<T>(definition);
 
         var items = new List<T>();
         double requestCharge = 0;
@@ -95,11 +132,6 @@ public sealed class CosmosQueryExecutor(
             var response = await iterator.ReadNextAsync(cancellationToken);
             requestCharge += response.RequestCharge;
             items.AddRange(response);
-        }
-
-        if (maxItemCount is > 0 && items.Count > maxItemCount.Value)
-        {
-            items = items.GetRange(0, maxItemCount.Value);
         }
 
         return new CosmosQueryPageResult<T>

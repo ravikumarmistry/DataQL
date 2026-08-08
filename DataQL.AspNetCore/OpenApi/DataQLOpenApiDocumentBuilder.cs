@@ -258,7 +258,48 @@ public sealed class DataQLOpenApiDocumentBuilder
             ["properties"] = new JsonObject
             {
                 ["key"] = new JsonObject { ["type"] = "string" },
-                ["provider"] = new JsonObject { ["type"] = "string" }
+                ["provider"] = new JsonObject { ["type"] = "string" },
+                ["description"] = new JsonObject { ["type"] = "string", ["nullable"] = true },
+                ["capabilities"] = new JsonObject
+                {
+                    ["type"] = "object",
+                    ["nullable"] = true,
+                    ["properties"] = new JsonObject
+                    {
+                        ["provider"] = new JsonObject { ["type"] = "string" },
+                        ["description"] = new JsonObject { ["type"] = "string", ["nullable"] = true },
+                        ["supportedOperators"] = new JsonObject
+                        {
+                            ["type"] = "array",
+                            ["items"] = new JsonObject { ["type"] = "string" }
+                        },
+                        ["supportsSelect"] = new JsonObject { ["type"] = "boolean" },
+                        ["supportsExclude"] = new JsonObject { ["type"] = "boolean" },
+                        ["supportsGrouping"] = new JsonObject { ["type"] = "boolean" },
+                        ["supportsHaving"] = new JsonObject { ["type"] = "boolean" },
+                        ["supportsNestedFields"] = new JsonObject { ["type"] = "boolean" },
+                        ["supportsDistinct"] = new JsonObject { ["type"] = "boolean" },
+                        ["supportedGroupOperations"] = new JsonObject
+                        {
+                            ["type"] = "array",
+                            ["items"] = new JsonObject { ["type"] = "string" }
+                        },
+                        ["notes"] = new JsonObject
+                        {
+                            ["type"] = "array",
+                            ["items"] = new JsonObject
+                            {
+                                ["type"] = "object",
+                                ["properties"] = new JsonObject
+                                {
+                                    ["code"] = new JsonObject { ["type"] = "string" },
+                                    ["severity"] = new JsonObject { ["type"] = "string" },
+                                    ["message"] = new JsonObject { ["type"] = "string" }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         };
     }

@@ -11,6 +11,22 @@ public sealed class SqlServerQueryTranslator : IQueryProviderTranslator
     public ProviderCapabilities Capabilities { get; } = new()
     {
         Provider = ProviderName.SqlServer,
+        Description = "SQL Server relational provider with seek paging, grouping, having, distinct, nested fields, and includeCount.",
+        Notes =
+        [
+            new CapabilityNote
+            {
+                Code = "Order.Required",
+                Severity = "restriction",
+                Message = "order is required on every query for deterministic paging and seek continuation."
+            },
+            new CapabilityNote
+            {
+                Code = "Paging.Seek",
+                Severity = "info",
+                Message = "Continuation uses keyset seek tokens. Do not change the request shape between pages."
+            }
+        ],
         SupportedOperators = new HashSet<string>
         {
             "$eq", "$ne", "$gt", "$gte", "$lt", "$lte",

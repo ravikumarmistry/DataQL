@@ -10,6 +10,7 @@ using DataQL.Abstractions;
 using DataQL.Ast.Parsing;
 using DataQL.Contracts;
 using DataQL.Cosmos.Translation;
+using DataQL.Cosmos.Validation;
 using DataQL.Pipeline;
 using DataQL.Token;
 using DataQL.Validation;
@@ -26,6 +27,7 @@ public sealed class CosmosQueryExecutionEngine
     private readonly IContinuationTokenProtector _tokenProtector;
     private readonly ProviderCapabilities _capabilities;
     private readonly IProviderCapabilityValidator _capabilityValidator;
+    private readonly IProviderQueryValidator _providerValidator;
 
     public CosmosQueryExecutionEngine(
         QueryProcessor? processor = null,
@@ -33,7 +35,8 @@ public sealed class CosmosQueryExecutionEngine
         ICosmosQueryExecutor? executor = null,
         IContinuationTokenProtector? tokenProtector = null,
         ProviderCapabilities? capabilities = null,
-        IProviderCapabilityValidator? capabilityValidator = null)
+        IProviderCapabilityValidator? capabilityValidator = null,
+        IProviderQueryValidator? providerValidator = null)
     {
         _processor = processor ?? new QueryProcessor(
             new QueryRequestValidator(),
@@ -44,6 +47,7 @@ public sealed class CosmosQueryExecutionEngine
         _tokenProtector = tokenProtector ?? new Base64ContinuationTokenProtector();
         _capabilities = capabilities ?? new CosmosQueryTranslator().Capabilities;
         _capabilityValidator = capabilityValidator ?? ProviderCapabilityValidator.Instance;
+        _providerValidator = providerValidator ?? CosmosProviderQueryValidator.Instance;
     }
 
     public async Task<QueryResponse<T>> ExecuteAsync<T>(
@@ -66,24 +70,36 @@ public sealed class CosmosQueryExecutionEngine
 
         var ast = _processor.Process(request);
         _capabilityValidator.EnsureValid(ast, _capabilities);
+        _providerValidator.EnsureValid(ast, request, _capabilities);
 
         var containerName = source.Name.Trim();
         var queryShapeHash = BuildQueryShapeHash(containerName, request);
         var translation = _translator.Translate(ast);
-        if (translation.IsGrouped && !string.IsNullOrWhiteSpace(request.ContinuationToken))
-        {
-            throw new NotSupportedException("Cosmos grouped queries do not support continuation tokens.");
-        }
 
         var feedToken = translation.IsGrouped
             ? null
             : DecodeFeedTokenOrThrow(request.ContinuationToken, queryShapeHash);
         var container = session.GetContainer(containerName);
 
+        long? count = null;
+        double? countRequestCharge = null;
+        if (request.IncludeCount && !translation.IsGrouped)
+        {
+            var countTranslation = _translator.TranslateCount(ast);
+            var countResult = await _executor.ExecuteCountAsync(container, countTranslation, cancellationToken);
+            count = countResult.Count;
+            countRequestCharge = countResult.RequestCharge;
+        }
+
+        // Grouped queries ignore limit (full aggregate set). Non-group uses MaxItemCount paging.
+        var maxItemCount = translation.IsGrouped
+            ? null
+            : request.Limit is > 0 ? request.Limit : null;
+
         var page = await _executor.ExecutePageAsync<T>(
             container,
             translation,
-            maxItemCount: request.Limit is > 0 ? request.Limit : null,
+            maxItemCount,
             feedContinuationToken: feedToken,
             cancellationToken);
 
@@ -99,20 +115,26 @@ public sealed class CosmosQueryExecutionEngine
             continuationToken = EncodeFeedToken(queryShapeHash, page.ContinuationToken!);
         }
 
+        var extensions = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["requestCharge"] = JsonSerializer.SerializeToElement(page.RequestCharge)
+        };
+        if (countRequestCharge is not null)
+        {
+            extensions["countRequestCharge"] = JsonSerializer.SerializeToElement(countRequestCharge.Value);
+        }
+
         return new QueryResponse<T>
         {
             Results = results,
             HasMore = hasMore,
             ContinuationToken = continuationToken,
-            Count = null,
+            Count = count,
             Meta = new QueryExecutionMeta
             {
                 Provider = ProviderName.Cosmos,
                 ExecutionTimeMs = 0,
-                Extensions = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase)
-                {
-                    ["requestCharge"] = JsonSerializer.SerializeToElement(page.RequestCharge)
-                }
+                Extensions = extensions
             }
         };
     }

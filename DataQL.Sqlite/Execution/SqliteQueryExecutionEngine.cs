@@ -13,6 +13,7 @@ using DataQL.Contracts;
 using DataQL.Pipeline;
 using DataQL.Token;
 using DataQL.Sqlite.Translation;
+using DataQL.Sqlite.Validation;
 using DataQL.Validation;
 using System.Text.Json;
 
@@ -28,6 +29,7 @@ public sealed class SqliteQueryExecutionEngine
     private readonly IContinuationTokenProtector _tokenProtector;
     private readonly ProviderCapabilities _capabilities;
     private readonly IProviderCapabilityValidator _capabilityValidator;
+    private readonly IProviderQueryValidator _providerValidator;
 
     public SqliteQueryExecutionEngine(
         QueryProcessor? processor = null,
@@ -35,7 +37,8 @@ public sealed class SqliteQueryExecutionEngine
         ISqliteQueryExecutor? executor = null,
         IContinuationTokenProtector? tokenProtector = null,
         ProviderCapabilities? capabilities = null,
-        IProviderCapabilityValidator? capabilityValidator = null)
+        IProviderCapabilityValidator? capabilityValidator = null,
+        IProviderQueryValidator? providerValidator = null)
     {
         _processor = processor ?? new QueryProcessor(
             new QueryRequestValidator(),
@@ -46,6 +49,7 @@ public sealed class SqliteQueryExecutionEngine
         _tokenProtector = tokenProtector ?? new Base64ContinuationTokenProtector();
         _capabilities = capabilities ?? new SqliteQueryTranslator().Capabilities;
         _capabilityValidator = capabilityValidator ?? ProviderCapabilityValidator.Instance;
+        _providerValidator = providerValidator ?? SqliteProviderQueryValidator.Instance;
     }
 
     public async Task<QueryResponse<T>> ExecuteAsync<T>(
@@ -68,6 +72,7 @@ public sealed class SqliteQueryExecutionEngine
 
         var ast = _processor.Process(request);
         _capabilityValidator.EnsureValid(ast, _capabilities);
+        _providerValidator.EnsureValid(ast, request, _capabilities);
         var tableName = ResolveSqliteTableName(source);
         var queryShapeHash = BuildQueryShapeHash(tableName, request);
         var tokenPayload = DecodeSeekTokenOrThrow(request.ContinuationToken, queryShapeHash, request.Order);

@@ -15,8 +15,11 @@ public sealed class SqliteDataQLProviderExecutor(
 {
     private readonly SqliteQueryExecutionEngine _engine = engine;
     private readonly SqliteMetadataProvider _metadata = new();
+    private readonly ProviderCapabilities _capabilities = new DataQL.Sqlite.SqliteQueryTranslator().Capabilities;
 
     public string Provider => ProviderName.Sqlite;
+
+    public ProviderCapabilities Capabilities => _capabilities;
 
     public Task<QueryResponse<T>> ExecuteAsync<T>(
         IDataQLSession session,
