@@ -11,6 +11,8 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.1" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.16.17" />
+    <PackageReference Include="Azure.Identity" Version="1.11.4" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.12-pre20260709125052" />
   </ItemGroup>
 
   <PropertyGroup>
