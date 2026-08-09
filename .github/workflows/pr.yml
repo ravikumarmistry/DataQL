@@ -1,17 +1,10 @@
-# Phase 1: build + unit tests (and Sqlite in-memory E2E). No Docker.
+# Build + unit tests on every pull request (any target branch).
 # SqlServer/Cosmos [AvailableFact] E2E soft-skip when those DBs are unreachable.
-# Phase 2 will require real DBs before NuGet publish.
-name: CI
+# Publish workflows re-run tests before releasing from main/prod.
+name: PR
 
 on:
-  push:
-    branches:
-      - main
-      - prod
   pull_request:
-    branches:
-      - main
-      - prod
 
 permissions:
   contents: read
